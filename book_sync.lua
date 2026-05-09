@@ -21,14 +21,12 @@ local BOOK_EXTENSIONS = {
     ".cbz", ".cbr", ".fb2", ".djvu", ".docx", ".txt"
 }
 
--- 获取书籍云端配置（独立于元数据配置）
 local function get_book_server()
     local json = require("json")
     local settings = G_reader_settings:readSetting("cloud_library_plugin", {})
     local book_cloud_dir = settings.book_cloud_dir
     
     if book_cloud_dir and book_cloud_dir ~= "" then
-        -- 有独立的书籍云端配置
         local server = {
             type = settings.book_cloud_type or "webdav",
             url = book_cloud_dir,
@@ -36,7 +34,6 @@ local function get_book_server()
             username = settings.book_cloud_username,
             password = settings.book_cloud_password,
         }
-        -- 如果缺少必要信息，回退到元数据配置
         if server.type == "webdav" and (not server.address or not server.username or not server.password) then
             return M.get_metadata_server()
         end
@@ -46,11 +43,9 @@ local function get_book_server()
         return server
     end
     
-    -- 没有独立配置，使用元数据配置
     return M.get_metadata_server()
 end
 
--- 获取元数据云端配置
 function M.get_metadata_server()
     local json = require("json")
     local server_json = G_reader_settings:readSetting("cloud_server_object")
@@ -122,49 +117,6 @@ function M.get_cloud_filename_for_path(book, naming_mode)
         title = original_filename:gsub("%.[^%.]+$", "")
     end
     return sanitize_filename(title) .. ext
-end
-
-function M.check_cloud_file_exists(cloud_filename)
-    logger.info("BookSync: check_cloud_file_exists, cloud_filename=" .. tostring(cloud_filename))
-    local server = get_book_server()
-    if not server then
-        logger.warn("BookSync: check_cloud_file_exists, server is nil")
-        return false
-    end
-    
-    local api = get_api(server)
-    if not api then
-        logger.warn("BookSync: check_cloud_file_exists, api is nil")
-        return false
-    end
-    
-    local cloud_path = get_cloud_path(server, cloud_filename)
-    if not cloud_path then
-        logger.warn("BookSync: check_cloud_file_exists, cloud_path is nil")
-        return false
-    end
-    
-    logger.info("BookSync: check_cloud_file_exists, cloud_path=" .. tostring(cloud_path))
-    
-    local temp_file = DataStorage:getDataDir() .. "check_temp.tmp"
-    local code
-    
-    if server.type == "dropbox" then
-        local token = server.password
-        if server.address and server.address ~= "" then
-            token = api:getAccessToken(server.password, server.address)
-        end
-        code = api:downloadFile(cloud_path, token, temp_file)
-    else
-        code = api:downloadFile(cloud_path, server.username, server.password, temp_file)
-    end
-    
-    if lfs.attributes(temp_file, "mode") then
-        os.remove(temp_file)
-    end
-    
-    logger.info("BookSync: check_cloud_file_exists, code=" .. tostring(code))
-    return type(code) == "number" and code == 200
 end
 
 function M.write_batch_book_log(results, action)
@@ -251,11 +203,9 @@ local function show_notification(msg, timeout)
 end
 
 function M.upload_book(book_path, show_msg, naming_mode, book_info)
-    logger.info("BookSync: upload_book 被调用, book_path=" .. tostring(book_path))
     show_msg = (show_msg == nil) or show_msg
     
     if lfs.attributes(book_path, "mode") ~= "file" then
-        logger.warn("BookSync: upload_book, 文件不存在")
         if show_msg then show_notification(_("书籍文件不存在"), 2) end
         return false, "file_not_found"
     end
@@ -269,27 +219,23 @@ function M.upload_book(book_path, show_msg, naming_mode, book_info)
         end
     end
     if not is_book then
-        logger.warn("BookSync: upload_book, 不支持的文件格式")
         if show_msg then show_notification(_("不支持的文件格式"), 2) end
         return false, "unsupported_format"
     end
     
     local server = get_book_server()
     if not server then
-        logger.warn("BookSync: upload_book, server is nil")
         if show_msg then show_notification(_("未配置云存储服务"), 2) end
         return false, "no_server_config"
     end
     
     if not NetworkMgr:isOnline() then
-        logger.warn("BookSync: upload_book, 网络未连接")
         if show_msg then show_notification(_("设备未连接到网络"), 2) end
         return false, "no_network"
     end
     
     local api = get_api(server)
     if not api then
-        logger.warn("BookSync: upload_book, api is nil")
         if show_msg then show_notification(_("不支持的云服务类型"), 2) end
         return false, "unsupported_server"
     end
@@ -301,11 +247,7 @@ function M.upload_book(book_path, show_msg, naming_mode, book_info)
     }, naming_mode)
     local cloud_path = get_cloud_path(server, cloud_filename)
     
-    logger.info("BookSync: upload_book, cloud_filename=" .. tostring(cloud_filename))
-    logger.info("BookSync: upload_book, cloud_path=" .. tostring(cloud_path))
-    
     if not cloud_path then
-        logger.warn("BookSync: upload_book, cloud_path is nil")
         if show_msg then show_notification(_("无法构建云端路径"), 2) end
         return false, "path_error"
     end
@@ -321,8 +263,6 @@ function M.upload_book(book_path, show_msg, naming_mode, book_info)
         code = api:uploadFile(cloud_path, server.username, server.password, book_path)
     end
     
-    logger.info("BookSync: upload_book, code=" .. tostring(code))
-    
     if type(code) == "number" and code >= 200 and code < 300 then
         return true, "success"
     elseif type(code) == "number" and code == 401 then
@@ -337,13 +277,11 @@ function M.upload_book(book_path, show_msg, naming_mode, book_info)
 end
 
 function M.download_book(cloud_filename, target_dir, show_msg)
-    logger.info("BookSync: download_book 被调用, cloud_filename=" .. tostring(cloud_filename))
     show_msg = (show_msg == nil) or show_msg
     
     local settings = G_reader_settings:readSetting("cloud_library_plugin", {})
     local download_dir = target_dir or settings.book_download_dir
     if not download_dir or download_dir == "" then
-        logger.warn("BookSync: download_book, 下载目录未设置")
         if show_msg then show_notification(_("请先在设置中指定书籍本地下载目录"), 3) end
         return false, "no_download_dir"
     end
@@ -353,7 +291,6 @@ function M.download_book(cloud_filename, target_dir, show_msg)
             os.execute("mkdir -p " .. download_dir)
         end)
         if lfs.attributes(download_dir, "mode") ~= "directory" then
-            logger.warn("BookSync: download_book, 无法创建下载目录")
             if show_msg then show_notification(_("无法创建下载目录"), 2) end
             return false, "cannot_create_dir"
         end
@@ -362,35 +299,29 @@ function M.download_book(cloud_filename, target_dir, show_msg)
     local local_path = download_dir .. "/" .. cloud_filename
     
     if lfs.attributes(local_path, "mode") == "file" then
-        logger.info("BookSync: 文件已存在，跳过: " .. cloud_filename)
         return false, "file_exists"
     end
     
     local server = get_book_server()
     if not server then
-        logger.warn("BookSync: download_book, server is nil")
         if show_msg then show_notification(_("未配置云存储服务"), 2) end
         return false, "no_server_config"
     end
     
     if not NetworkMgr:isOnline() then
-        logger.warn("BookSync: download_book, 网络未连接")
         if show_msg then show_notification(_("设备未连接到网络"), 2) end
         return false, "no_network"
     end
     
     local api = get_api(server)
     if not api then
-        logger.warn("BookSync: download_book, api is nil")
         if show_msg then show_notification(_("不支持的云服务类型"), 2) end
         return false, "unsupported_server"
     end
     
     local cloud_path = get_cloud_path(server, cloud_filename)
-    logger.info("BookSync: download_book, cloud_path=" .. tostring(cloud_path))
     
     if not cloud_path then
-        logger.warn("BookSync: download_book, cloud_path is nil")
         if show_msg then show_notification(_("无法构建云端路径"), 2) end
         return false, "path_error"
     end
@@ -410,23 +341,18 @@ function M.download_book(cloud_filename, target_dir, show_msg)
         code = api:downloadFile(cloud_path, server.username, server.password, local_path)
     end
     
-    logger.info("BookSync: download_book, code=" .. tostring(code))
-    
     if type(code) == "number" and code == 200 then
         if show_msg then
             show_notification(string.format(_("✓ 下载成功: %s"), cloud_filename), 2)
         end
         return true, "success", local_path
     elseif type(code) == "number" and code == 404 then
-        logger.warn("BookSync: download_book, 文件不存在")
         if show_msg then show_notification(_("云端文件不存在"), 2) end
         return false, "file_not_found"
     elseif type(code) == "number" and code == 401 then
-        logger.warn("BookSync: download_book, 认证失败")
         if show_msg then show_notification(_("云存储认证失败"), 2) end
         return false, "auth_failed"
     else
-        logger.warn("BookSync: download_book, 下载失败, code=" .. tostring(code))
         if show_msg then
             show_notification(string.format(_("下载失败 (HTTP %s)"), tostring(code)), 3)
         end
@@ -435,41 +361,34 @@ function M.download_book(cloud_filename, target_dir, show_msg)
 end
 
 function M.delete_cloud_book(cloud_filename, show_msg)
-    logger.info("BookSync: delete_cloud_book 被调用, cloud_filename=" .. tostring(cloud_filename))
     show_msg = (show_msg == nil) or show_msg
     
     local server = get_book_server()
     if not server then
-        logger.warn("BookSync: delete_cloud_book, server is nil")
         if show_msg then show_notification(_("未配置云存储服务"), 2) end
         return false, "no_server_config"
     end
     
     if not NetworkMgr:isOnline() then
-        logger.warn("BookSync: delete_cloud_book, 网络未连接")
         if show_msg then show_notification(_("设备未连接到网络"), 2) end
         return false, "no_network"
     end
     
     local cloud_path = get_cloud_path(server, cloud_filename)
-    logger.info("BookSync: delete_cloud_book, cloud_path=" .. tostring(cloud_path))
     
     if not cloud_path then
-        logger.warn("BookSync: delete_cloud_book, cloud_path is nil")
         if show_msg then show_notification(_("无法构建云端路径"), 2) end
         return false, "path_error"
     end
     
     local code
     if server.type == "dropbox" then
-        -- Dropbox: 直接发送 DELETE 请求到 API
         local http = require("socket.http")
         local ltn12 = require("ltn12")
         local json = require("json")
         
         local token = server.password
         if server.address and server.address ~= "" then
-            -- 需要先获取 access token
             local api = get_api(server)
             if api then
                 local new_token = api:getAccessToken(server.password, server.address)
@@ -486,8 +405,6 @@ function M.delete_cloud_book(cloud_filename, show_msg)
             ["Content-Length"] = tostring(#data),
         }
         
-        logger.info("BookSync: delete_cloud_book, 发送 Dropbox DELETE 请求")
-        
         local response, status_code = http.request{
             url = "https://api.dropboxapi.com/2/files/delete_v2",
             method = "POST",
@@ -496,18 +413,14 @@ function M.delete_cloud_book(cloud_filename, show_msg)
         }
         
         code = status_code or 500
-        logger.info("BookSync: delete_cloud_book, Dropbox 响应状态码: " .. tostring(code))
         
     elseif server.type == "webdav" then
-        -- WebDAV: 直接发送 DELETE 请求
         local http = require("socket.http")
         local sha2 = require("ffi/sha2")
         local headers = {
             ["User-Agent"] = "KOReader-CloudLibrary",
             ["Authorization"] = "Basic " .. sha2.bin_to_base64(server.username .. ":" .. server.password),
         }
-        
-        logger.info("BookSync: delete_cloud_book, 发送 WebDAV DELETE 请求到: " .. cloud_path)
         
         local response, status_code = http.request{
             url = cloud_path,
@@ -516,7 +429,6 @@ function M.delete_cloud_book(cloud_filename, show_msg)
         }
         
         code = status_code or 500
-        logger.info("BookSync: delete_cloud_book, WebDAV 响应状态码: " .. tostring(code))
     else
         if show_msg then show_notification(_("不支持的云服务类型"), 2) end
         return false, "unsupported_server"
@@ -528,15 +440,12 @@ function M.delete_cloud_book(cloud_filename, show_msg)
         end
         return true, "success"
     elseif type(code) == "number" and code == 404 then
-        logger.warn("BookSync: delete_cloud_book, 文件不存在")
         if show_msg then show_notification(_("云端文件不存在"), 2) end
         return false, "file_not_found"
     elseif type(code) == "number" and code == 401 then
-        logger.warn("BookSync: delete_cloud_book, 认证失败")
         if show_msg then show_notification(_("云存储认证失败，请重新配置"), 3) end
         return false, "auth_failed"
     else
-        logger.warn("BookSync: delete_cloud_book, 删除失败, code=" .. tostring(code))
         if show_msg then
             show_notification(string.format(_("删除失败 (HTTP %s)"), tostring(code)), 3)
         end
@@ -545,8 +454,6 @@ function M.delete_cloud_book(cloud_filename, show_msg)
 end
 
 function M.batch_delete_books(book_names, settings)
-    logger.info("BookSync: batch_delete_books 被调用, 共 " .. #book_names .. " 本")
-    
     local results = {
         success = {},
         failed = {}
@@ -592,22 +499,18 @@ function M.batch_delete_books(book_names, settings)
 end
 
 function M.get_cloud_book_list()
-    logger.info("BookSync: get_cloud_book_list 被调用")
     local server = get_book_server()
     if not server then
-        logger.warn("BookSync: get_cloud_book_list, server is nil")
         return nil, "未配置云存储服务"
     end
     
     local book_dir = server.url
     if not book_dir or book_dir == "" then
-        logger.warn("BookSync: get_cloud_book_list, 云端目录未设置")
         return nil, "云端目录未设置"
     end
     
     local api = get_api(server)
     if not api then
-        logger.warn("BookSync: get_cloud_book_list, api is nil")
         return nil, "不支持的云服务类型"
     end
     
@@ -633,7 +536,6 @@ function M.get_cloud_book_list()
     end
     
     if not items or type(items) ~= "table" then
-        logger.warn("BookSync: get_cloud_book_list, items is nil or not table")
         return nil, "无法获取云端文件列表"
     end
     
@@ -660,13 +562,39 @@ function M.get_cloud_book_list()
         end
     end
     
-    logger.info("BookSync: get_cloud_book_list, 找到 " .. #books .. " 本书")
     return books, nil
 end
 
 function M.show_cloud_book_dialog(callback, plugin)
-    logger.info("BookSync: show_cloud_book_dialog 被调用")
+    -- 👇 检查1：网络连接
+    local NetworkMgr = require("ui/network/manager")
+    if not NetworkMgr:isOnline() then
+        show_notification(_("网络未连接，无法获取云端列表"), 3)
+        return
+    end
     
+    -- 👇 检查2：服务器配置
+    local remote = require("remote")
+    local server = remote.get_server()
+    if not server then
+        show_notification(_("未配置云存储服务，请先在设置中配置"), 3)
+        return
+    end
+    
+    -- 👇 检查3：云端目录
+    if not server.url or server.url == "" then
+        show_notification(_("未设置云端目录，请先在云端目录中配置"), 3)
+        return
+    end
+    
+    -- 👇 检查4：云服务类型
+    local api = remote.get_api(server)
+    if not api then
+        show_notification(_("不支持的云服务类型，请使用 WebDAV 或 Dropbox"), 3)
+        return
+    end
+    -- 👆
+
     local books, err = M.get_cloud_book_list()
     if not books or #books == 0 then
         show_notification(err or _("云端没有找到书籍文件"), 3)
@@ -959,9 +887,6 @@ function M.show_cloud_book_dialog(callback, plugin)
 end
 
 function M.batchUploadBooks(selected_books, naming_mode, settings, plugin)
-    logger.info("BookSync: batchUploadBooks 被调用, 共 " .. #selected_books .. " 本书")
-    logger.info("BookSync: naming_mode = " .. tostring(naming_mode))
-    
     local results = {
         success = {},
         failed = {}
@@ -1023,13 +948,9 @@ function M.batchUploadBooks(selected_books, naming_mode, settings, plugin)
     end
     
     M.cleanupFileManagerSelection()
-    
-    logger.info("BookSync: 批量上传完成, 成功:" .. #results.success .. ", 失败:" .. #results.failed)
 end
 
 function M.batchDownloadBooks(book_names, settings, plugin)
-    logger.info("BookSync: batchDownloadBooks 被调用, 共 " .. #book_names .. " 本")
-    
     local download_dir = settings.book_download_dir
     local results = {
         success = {},
@@ -1091,8 +1012,6 @@ function M.batchDownloadBooks(book_names, settings, plugin)
     end
     
     M.refreshFileManager()
-    
-    logger.info("BookSync: 批量下载完成, 成功:" .. #results.success .. ", 失败:" .. #results.failed .. ", 跳过:" .. #results.skipped)
 end
 
 function M.refreshFileManager()
@@ -1163,8 +1082,47 @@ function M.cleanupFileManagerSelection()
 end
 
 function M.batchUploadWithFMSelection(plugin)
-    logger.info("BookSync: batchUploadWithFMSelection 被调用")
+    -- 👇 检查1：网络连接
+    local NetworkMgr = require("ui/network/manager")
+    if not NetworkMgr:isOnline() then
+        UIManager:show(Notification:new{
+            text = _("网络未连接，无法上传"),
+            timeout = 3
+        })
+        return
+    end
     
+    -- 👇 检查2：服务器配置
+    local remote = require("remote")
+    local server = remote.get_server()
+    if not server then
+        UIManager:show(Notification:new{
+            text = _("未配置云存储服务，请先在设置中配置"),
+            timeout = 3
+        })
+        return
+    end
+    
+    -- 👇 检查3：云端目录
+    if not server.url or server.url == "" then
+        UIManager:show(Notification:new{
+            text = _("未设置云端目录，请先在云端目录中配置"),
+            timeout = 3
+        })
+        return
+    end
+    
+    -- 👇 检查4：云服务类型
+    local api = remote.get_api(server)
+    if not api then
+        UIManager:show(Notification:new{
+            text = _("不支持的云服务类型，请使用 WebDAV 或 Dropbox"),
+            timeout = 3
+        })
+        return
+    end
+    -- 👆
+
     local ui = plugin.ui
     local action_text = "上传"
     local button_text = "批量上传选中书籍"
