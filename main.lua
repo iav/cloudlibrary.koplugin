@@ -40,10 +40,9 @@ CloudLibraryPlugin.default_settings = {
     book_cloud_password = nil,
 }
 
-CloudLibraryPlugin.VERSION = "v1.2"
-CloudLibraryPlugin.UPDATE_DATE = "2026/04/14"
 
 function CloudLibraryPlugin:init()
+    self.VERSION = "v1.3"
     logger.info("CloudLibrary: init 开始, 版本 " .. self.VERSION)
     
     self.ui.menu:registerToMainMenu(self)
