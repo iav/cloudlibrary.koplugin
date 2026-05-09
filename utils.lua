@@ -138,14 +138,8 @@ function M.write_log(log_path, content)
 end
 
 function M.get_log_path()
-    local data_dir = DataStorage:getDataDir()
-    if not data_dir then
-        data_dir = os.getenv("HOME") or "/mnt/us"
-        if data_dir then
-            data_dir = data_dir .. "/.koreader/"
-        end
-    end
-    return data_dir .. "同步记录.txt"
+    local DataStorage = require("datastorage")
+    return DataStorage:getDataDir() .. "/同步记录.txt"
 end
 
 
