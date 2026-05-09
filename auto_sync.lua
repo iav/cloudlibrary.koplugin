@@ -51,22 +51,59 @@ function AutoSync:sync(document, is_upload, source)
         return 
     end
     
+    -- 👇 检查1：网络连接
+    local NetworkMgr = require("ui/network/manager")
+    if not NetworkMgr:isOnline() then
+        if self.settings.auto_sync_notify then
+            local book_title = document.title or (document.file and document.file:match("([^/]+)$"):gsub("%.[^%.]+$", "")) or "书籍"
+            self:showNotification(book_title, "同步失败(网络未连接)", nil, false)
+        end
+        return
+    end
+    
+    -- 👇 检查2：服务器配置
+    local remote = require("remote")
+    local server = remote.get_server()
+    if not server then
+        if self.settings.auto_sync_notify then
+            local book_title = document.title or (document.file and document.file:match("([^/]+)$"):gsub("%.[^%.]+$", "")) or "书籍"
+            self:showNotification(book_title, "同步失败(未配置云存储)", nil, false)
+        end
+        return
+    end
+    
+    -- 👇 检查3：云端目录
+    if not server.url or server.url == "" then
+        if self.settings.auto_sync_notify then
+            local book_title = document.title or (document.file and document.file:match("([^/]+)$"):gsub("%.[^%.]+$", "")) or "书籍"
+            self:showNotification(book_title, "同步失败(未设置云端目录)", nil, false)
+        end
+        return
+    end
+    
+    -- 👇 检查4：云服务类型
+    local api = remote.get_api(server)
+    if not api then
+        if self.settings.auto_sync_notify then
+            local book_title = document.title or (document.file and document.file:match("([^/]+)$"):gsub("%.[^%.]+$", "")) or "书籍"
+            self:showNotification(book_title, "同步失败(不支持的云服务)", nil, false)
+        end
+        return
+    end
+    -- 👆
+
     if is_upload and self.skip_auto_upload then
-        logger.info("CloudLibrary: 跳过自动上传（手动操作中）")
         return
     end
     
     if not is_upload and self.skip_auto_download then
-        logger.info("CloudLibrary: 跳过自动下载（手动操作中）")
         return
     end
     
     if self.is_syncing then
-        logger.info("CloudLibrary: 正在同步中，跳过")
         return
     end
     
-    -- 检查是否开启对应的自动同步
     if is_upload then
         if not self:shouldUpload(source) then
             return
@@ -114,7 +151,6 @@ function AutoSync:sync(document, is_upload, source)
     }
     
     if not metadata_file or not lfs.attributes(metadata_file, "mode") then
-        logger.warn("CloudLibrary: 找不到元数据文件: " .. file)
         local error_info = {
             reason = "未找到本地元数据文件",
             solution = "请先打开该书生成元数据文件"
@@ -143,8 +179,8 @@ function AutoSync:sync(document, is_upload, source)
                 local error_info = remote.get_error_message(error_type, true, naming_mode)
                 self:writeLog(book, source_desc, true, false, error_info.reason, nil, error_info.solution)
                 self:updateLastSync("元数据同步-自动同步(" .. source_desc .. ")-上传失败")
-                logger.warn("CloudLibrary: 自动上传失败: " .. error_info.reason)
-                self:showNotification(book.title, "自动备份失败", nil, false)
+                local fail_msg = string.format("自动备份失败 (%s)", error_info.reason)
+                self:showNotification(book.title, fail_msg, nil, false)
             end
         else
             local mode_desc = (self.settings.auto_download_mode == "merge") and "合并更新" or "覆盖更新"
@@ -163,8 +199,8 @@ function AutoSync:sync(document, is_upload, source)
                 local error_info = remote.get_error_message(error_type, false, naming_mode)
                 self:writeLog(book, source_desc, false, false, error_info.reason, nil, error_info.solution)
                 self:updateLastSync("元数据同步-自动同步(" .. source_desc .. ")-下载失败")
-                logger.warn("CloudLibrary: 自动下载失败: " .. error_info.reason)
-                self:showNotification(book.title, "自动更新失败", mode_desc, false)
+                local fail_msg = string.format("自动更新失败 (%s)", error_info.reason)
+                self:showNotification(book.title, fail_msg, mode_desc, false)
             end
         end
         
@@ -176,13 +212,19 @@ function AutoSync:showNotification(title, operation, mode, is_success)
     if not self.settings.auto_sync_notify then
         return
     end
-    
+
+    local max_len = 30
+    local display_title = title
+    if title and #title > max_len then
+        display_title = title:sub(1, max_len) .. "..."
+    end
+
     local icon = is_success and "✓" or "✗"
     local text
     if mode then
-        text = string.format("%s %s - %s - %s", icon, title, operation, mode)
+        text = string.format("%s %s - %s - %s", icon, display_title, operation, mode)  -- ✅ 改用 display_title
     else
-        text = string.format("%s %s - %s", icon, title, operation)
+        text = string.format("%s %s - %s", icon, display_title, operation)  -- ✅ 改用 display_title
     end
     
     UIManager:show(Notification:new{
