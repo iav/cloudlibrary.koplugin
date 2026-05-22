@@ -28,40 +28,40 @@ local ERROR_TYPES = {
 function M.get_error_message(error_type, is_upload, naming_mode)
     local messages = {
         [ERROR_TYPES.NO_NETWORK] = { 
-            reason = "设备未连接到网络", 
-            solution = "请打开 Wi-Fi 后重试" 
+            reason = _("Device not connected to network"), 
+            solution = _("Please turn on Wi-Fi and try again") 
         },
         [ERROR_TYPES.NO_SERVER_CONFIG] = { 
-            reason = "未配置云存储服务", 
-            solution = "请在设置中配置云存储" 
+            reason = _("Cloud storage service not configured"), 
+            solution = _("Please configure cloud storage in settings") 
         },
         [ERROR_TYPES.UNSUPPORTED_SERVER] = { 
-            reason = "不支持的云服务类型", 
-            solution = "请使用 WebDAV 或 Dropbox" 
+            reason = _("Unsupported cloud storage type"), 
+            solution = _("Please use WebDAV or Dropbox") 
         },
         [ERROR_TYPES.AUTH_FAILED] = { 
-            reason = "云存储认证失败", 
-            solution = "请检查用户名/密码" 
+            reason = _("Cloud storage authentication failed"), 
+            solution = _("Please check username/password") 
         },
         [ERROR_TYPES.LOCAL_METADATA_NOT_EXISTS] = { 
-            reason = "未找到本地元数据文件", 
-            solution = "请先打开该书生成元数据文件" 
+            reason = _("Local metadata file not found"), 
+            solution = _("Please open the book first to generate metadata file") 
         },
         [ERROR_TYPES.CLOUD_FILE_NOT_FOUND] = { 
-            reason = "云端未找到元数据文件", 
-            solution = "请先上传该书" 
+            reason = _("Metadata file not found in cloud"), 
+            solution = _("Please upload the book first") 
         },
         [ERROR_TYPES.FILENAME_TOO_LONG] = { 
-            reason = "云端文件名过长导致上传失败", 
-            solution = string.format("请尝试：\n1. 缩短书籍文件名\n2. 切换云端命名方式为「使用书籍标题」（标题一般不会太长）\n当前命名方式：%s", 
-                naming_mode == "metadata" and "使用书籍标题" or "使用文件名") 
+            reason = _("Cloud filename too long, upload failed"), 
+            solution = string.format(_("Please try:\n1. Shorten the book filename\n2. Switch cloud naming to \"Use Book Title\"\nCurrent naming mode: %s"), 
+                naming_mode == "metadata" and _("Use Book Title") or _("Use Filename")) 
         },
         [ERROR_TYPES.UNKNOWN_ERROR] = { 
-            reason = "未知错误", 
-            solution = "请查看日志文件" 
+            reason = _("Unknown error"), 
+            solution = _("Please check the log file") 
         }
     }
-    return messages[error_type] or { reason = "未知错误", solution = "请联系开发者" }
+    return messages[error_type] or { reason = _("Unknown error"), solution = _("Contact developer") }
 end
 
 function M.ensure_download_dir()
@@ -174,7 +174,7 @@ function M.save_server_settings(server)
     G_reader_settings:saveSetting("cloud_download_dir", server.url)
     G_reader_settings:saveSetting("cloud_provider_type", server.type)
     UIManager:show(InfoMessage:new{
-        text = string.format(_("云服务已设置:\n%s"), server.url),
+        text = string.format(_("Cloud storage configured:\n%s"), server.url),
         timeout = 3
     })
 end
@@ -421,14 +421,14 @@ function M.upload_dual_format(server, lua_path, lua_filename, book)
     local json_success = M.upload_json_to_cloud(server, json_tmp_path, lua_filename)
     
     if json_success and book and book.title then
-        local log_path = DataStorage:getDataDir() .. "/同步记录.txt"
+        local log_path = DataStorage:getDataDir() .. "/cloudlibrary_sync_log.txt"
         local f = io.open(log_path, "a")
         if f then
             local timestamp = os.date("%Y-%m-%d %H:%M:%S")
             if use_notemark then
-                f:write(string.format("[%s] JSON格式已上传（含NoteMarkData）: %s\n", timestamp, book.title))
+                f:write(string.format("[%s] JSON format uploaded (NoteMarkData): %s\n", timestamp, book.title))
             else
-                f:write(string.format("[%s] JSON格式已上传: %s\n", timestamp, book.title))
+                f:write(string.format("[%s] JSON format uploaded: %s\n", timestamp, book.title))
             end
             f:close()
         end
@@ -545,7 +545,7 @@ function M.upload_book(book, naming_mode)
     return false, ERROR_TYPES.UNKNOWN_ERROR
 end
 
-function M.download_book(book, naming_mode)
+function M.download_book(book, naming_mode, progress_callback)
     local Merger = require("merge")
     local ReaderUI = require("apps/reader/readerui")
     local current_ui = ReaderUI.instance
@@ -604,9 +604,9 @@ function M.download_book(book, naming_mode)
         if server.address and server.address ~= "" then
             token = api:getAccessToken(server.password, server.address)
         end
-        code = api:downloadFile(cloud_path, token, downloaded_file)
+        code = api:downloadFile(cloud_path, token, downloaded_file, progress_callback)
     else
-        code = api:downloadFile(cloud_path, server.username, server.password, downloaded_file)
+        code = api:downloadFile(cloud_path, server.username, server.password, downloaded_file, progress_callback)
     end
     
     if type(code) ~= "number" or code ~= 200 then
@@ -657,7 +657,7 @@ function M.download_book(book, naming_mode)
     return true
 end
 
-function M.download_book_merge(book, naming_mode)
+function M.download_book_merge(book, naming_mode, progress_callback)
     local Merger = require("merge")
     local ReaderUI = require("apps/reader/readerui")
     local current_ui = ReaderUI.instance
@@ -716,9 +716,9 @@ function M.download_book_merge(book, naming_mode)
         if server.address and server.address ~= "" then
             token = api:getAccessToken(server.password, server.address)
         end
-        code = api:downloadFile(cloud_path, token, downloaded_file)
+        code = api:downloadFile(cloud_path, token, downloaded_file, progress_callback)
     else
-        code = api:downloadFile(cloud_path, server.username, server.password, downloaded_file)
+        code = api:downloadFile(cloud_path, server.username, server.password, downloaded_file, progress_callback)
     end
     
     if type(code) ~= "number" or code ~= 200 then
