@@ -1,3 +1,7 @@
+-- i18n must be installed before any other require()
+local i18n = require("i18n")
+i18n.install()
+
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local Dispatcher = require("dispatcher")
 local UIManager = require("ui/uimanager")
@@ -26,6 +30,7 @@ CloudLibraryPlugin.default_settings = {
     auto_upload_on_suspend = false,
     auto_download_on_open = false,
     auto_download_mode = "merge",
+    manual_download_mode = "merge", 
     auto_sync_notify = true,
     upload_json = false,
     use_notemark_format = false,
@@ -42,8 +47,8 @@ CloudLibraryPlugin.default_settings = {
 
 
 function CloudLibraryPlugin:init()
-    self.VERSION = "v1.3"
-    logger.info("CloudLibrary: init 开始, 版本 " .. self.VERSION)
+    self.VERSION = "v1.4"
+    logger.info("CloudLibrary: init started, version " .. self.VERSION)
     
     self.ui.menu:registerToMainMenu(self)
     
@@ -84,12 +89,12 @@ function CloudLibraryPlugin:init()
 
     G_reader_settings:saveSetting("cloudlibrary_skip_auto_download", false)
     
-    logger.info("CloudLibrary: 插件初始化完成")
+    logger.info("CloudLibrary: plugin init completed")
 end
 
 function CloudLibraryPlugin:addToMainMenu(menu_items)
     menu_items.cloud_library_plugin = {
-        text = _("云端书库"),
+        text = _("Cloud Library"),
         sorting_hint = "tools",
         sub_item_table = self:buildMenuItems(),
     }
@@ -99,32 +104,32 @@ function CloudLibraryPlugin:buildMenuItems()
     local utils = require("utils")
     local items = {
         {
-            text = _("设置"),
+            text = _("Settings"),
             sub_item_table = self:buildSettingsMenu(),
             separator = true,
         },
         {
-            text = _("元数据同步"),
+            text = _("Metadata Sync"),
             sub_item_table = self:buildMetadataSyncMenu(),
         },
         {
-            text = _("书籍同步"),
+            text = _("Book Sync"),
             sub_item_table = self:buildBookSyncMenu(),
         },
         {
-            text = _("查看同步记录"),
+            text = _("View Sync Log"),
             callback = function()
                 self:viewSyncLog()
             end,
         },
         {
-            text = _("插件说明"),
+            text = _("Plugin Info"),
             callback = function()
                 self:showPluginInfo()
             end,
         },
         {
-            text = _("检查更新") .. "  (作者：gytwo  当前版本: " .. self.VERSION .. ")",
+            text = _("Updates") .. "  (" .. _("Author") .. ": gytwo  " .. _("Current version") .. ": " .. self.VERSION .. ")",
             callback = function()
                 local update = require("update")
                 update.check_for_updates(false, self)
@@ -135,14 +140,14 @@ function CloudLibraryPlugin:buildMenuItems()
             text_func = function()
                 local last_sync = self.settings.last_sync
                 if last_sync == "Never" then
-                    return T(_("最后同步：%1"), last_sync)
+                    return T(_("Last sync: %1"), last_sync)
                 end
                 local time_part = last_sync:match("(.+) %(") or last_sync
                 local action_part = last_sync:match("%((.+)%)") or ""
                 if action_part ~= "" then
-                    return string.format("最后同步：%s\n(%s)", time_part, action_part)
+                    return string.format("Last sync: %s\n(%s)", time_part, action_part)
                 else
-                    return T(_("最后同步：%1"), last_sync)
+                    return T(_("Last sync: %1"), last_sync)
                 end
             end
         },
@@ -154,12 +159,12 @@ function CloudLibraryPlugin:buildSettingsMenu()
     local utils = require("utils")
     return {
         {
-            text = _("云端目录"),
+            text = _("Cloud Directory"),
             sub_item_table = self:buildCloudDirMenu(),
             separator = true,
         },
         {
-            text = _("云端命名方式"),
+            text = _("Cloud Naming Rules"),
             sub_item_table = self:buildNamingModeMenu(),
             separator = true,
         },
@@ -167,9 +172,9 @@ function CloudLibraryPlugin:buildSettingsMenu()
             text_func = function()
                 local dir = self.settings.book_download_dir
                 if dir and dir ~= "" then
-                    return _("书籍下载目录: ") .. dir
+                    return _("Book Download Directory: ") .. dir
                 else
-                    return _("设置书籍下载目录")
+                    return _("Set Book Download Directory")
                 end
             end,
             callback = function()
@@ -177,42 +182,42 @@ function CloudLibraryPlugin:buildSettingsMenu()
             end,
         },
         {
-            text = _("元数据下载模式（手动）"),
+            text = _("Metadata Download Mode (Manual)"),
             sub_item_table = {
                 {
-                    text = _("覆盖更新"),
+                    text = _("Overwrite"),
                     checked_func = function()
-                        return self.settings.auto_download_mode == "override"
+                        return self.settings.manual_download_mode == "override"
                     end,
                     callback = function()
-                        self.settings.auto_download_mode = "override"
+                        self.settings.manual_download_mode = "override"
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                        utils.show_msg(_("元数据下载模式（手动）：覆盖更新"))
+                        utils.show_msg(_("Metadata download mode (manual): Overwrite"))
                     end
                 },
                 {
-                    text = _("合并更新"),
+                    text = _("Merge"),
                     checked_func = function()
-                        return self.settings.auto_download_mode == "merge"
+                        return self.settings.manual_download_mode == "merge"
                     end,
                     callback = function()
-                        self.settings.auto_download_mode = "merge"
+                        self.settings.manual_download_mode = "merge"
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                        utils.show_msg(_("元数据下载模式（手动）：合并更新"))
+                        utils.show_msg(_("Metadata download mode (manual): Merge"))
                     end
                 },
             },
         },
         {
-            text = _("自动同步设置（仅元数据）"),
+            text = _("Auto Sync Settings (Metadata Only)"),
             sub_item_table = self:buildAutoSyncMenu(),
             separator = true,
         },
         {
-            text = _("元数据额外备份JSON"),
+            text = _("Additional JSON Backup"),
             sub_item_table = {
                 {
-                    text = _("保持原有格式（默认）"),
+                    text = _("Original format (default)"),
                     checked_func = function()
                         return self.settings.upload_json == true and self.settings.use_notemark_format == false
                     end,
@@ -225,15 +230,15 @@ function CloudLibraryPlugin:buildSettingsMenu()
                             self.settings.use_notemark_format = false
                         end
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                        utils.show_msg(self.settings.upload_json and "已开启：原始格式" or "已关闭额外备份JSON")
+                        utils.show_msg(self.settings.upload_json and _("Enabled: Original format") or _("Disabled: Additional JSON backup"))
                     end
                 },
                 {
-                    text = _("使用NoteMarkData格式（标注转换）"),
+                    text = _("NoteMarkData format"),
                     checked_func = function()
                         return self.settings.upload_json == true and self.settings.use_notemark_format == true
                     end,
-                    help_text = _("开启后：将标注转换为NoteMarkData格式"),
+                    help_text = _("When enabled: Convert annotations to NoteMarkData format"),
                     callback = function()
                         if self.settings.upload_json and self.settings.use_notemark_format then
                             self.settings.upload_json = false
@@ -243,31 +248,31 @@ function CloudLibraryPlugin:buildSettingsMenu()
                             self.settings.use_notemark_format = true
                         end
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                        utils.show_msg(self.settings.upload_json and "已开启：NoteMarkData格式" or "已关闭额外备份JSON")
+                        utils.show_msg(self.settings.upload_json and _("Enabled: NoteMarkData format") or _("Disabled: Additional JSON backup"))
                     end
                 },
             },
         },
         {
-            text = _("覆盖更新时保留本地文档设置"),
+            text = _("Keep local document settings when overwriting"),
             checked_func = function()
                 return self.settings.override_keep_local_settings == true
             end,
-            help_text = _("开启后：覆盖更新时保留本地的字体、边距等设置，仅同步标注和进度"),
+            help_text = _("When enabled: Keep local font, margin settings when overwriting, only sync annotations and progress"),
             callback = function()
                 self.settings.override_keep_local_settings = not self.settings.override_keep_local_settings
                 G_reader_settings:saveSetting(self.plugin_id, self.settings)
                 utils.show_msg(self.settings.override_keep_local_settings and 
-                    "已开启：覆盖更新时保留本地文档设置" or 
-                    "已关闭：覆盖更新时完全使用云端文件")
+                    _("Enabled: Keep local document settings when overwriting") or 
+                    _("Disabled: Fully use cloud file when overwriting"))
             end
         },
         {
-            text = _("开启记录云同步"),
+            text = _("Enable Cloud Sync Log"),
             checked_func = function()
                 return self.settings.sync_log_enabled == true
             end,
-            help_text = _("开启后：自动上传本地记录至云端或从云端合并同步记录至本地"),
+            help_text = _("When enabled: Automatically upload local sync logs to cloud or merge cloud logs locally"),
             callback = function()
                 self.settings.sync_log_enabled = not self.settings.sync_log_enabled
                 G_reader_settings:saveSetting(self.plugin_id, self.settings)
@@ -275,15 +280,15 @@ function CloudLibraryPlugin:buildSettingsMenu()
                 if self.settings.sync_log_enabled then
                     local sync_log = require("sync_log")
                     sync_log.sync_log()
-                    utils.show_msg(_("已开启记录云同步"))
+                    utils.show_msg(_("Cloud sync log enabled"))
                 else
-                    utils.show_msg(_("已关闭记录云同步"))
+                    utils.show_msg(_("Cloud sync log disabled"))
                 end
             end
         },
         {
-            text = _("清空云端同步记录"),
-            help_text = _("清空云端存储的所有同步记录，不会影响本地记录"),
+            text = _("Clear Cloud Sync Log"),
+            help_text = _("Clear all sync logs stored in the cloud, local logs will not be affected"),
             callback = function()
                 self:confirmClearCloudLog()
             end,
@@ -299,9 +304,9 @@ function CloudLibraryPlugin:buildCloudDirMenu()
                 local remote = require("remote")
                 local server = remote.get_server()
                 if server and server.url then
-                    return _("元数据云端目录: ") .. server.url
+                    return _("Metadata Cloud Directory: ") .. server.url
                 else
-                    return _("设置元数据云端目录")
+                    return _("Set Metadata Cloud Directory")
                 end
             end,
             callback = function()
@@ -318,9 +323,9 @@ function CloudLibraryPlugin:buildCloudDirMenu()
             text_func = function()
                 local book_dir = self.settings.book_cloud_dir
                 if book_dir and book_dir ~= "" then
-                    return _("书籍云端目录: ") .. book_dir
+                    return _("Book Cloud Directory: ") .. book_dir
                 else
-                    return _("设置书籍云端目录（默认与元数据相同）")
+                    return _("Set Book Cloud Directory (defaults to metadata directory)")
                 end
             end,
             callback = function()
@@ -358,9 +363,9 @@ end
 
 function CloudLibraryPlugin:confirmClearCloudLog()
     UIManager:show(ConfirmBox:new{
-        text = _("确定要清空云端的同步记录吗？\n\n此操作不会影响本地的同步记录，但其他设备将无法同步到已清空的记录。"),
-        ok_text = _("清空"),
-        cancel_text = _("取消"),
+        text = _("Are you sure you want to clear all sync logs from the cloud?\n\nThis will not affect local logs, but other devices will not be able to sync cleared records."),
+        ok_text = _("Clear"),
+        cancel_text = _("Cancel"),
         ok_callback = function()
             self:doClearCloudLog()
         end
@@ -372,20 +377,20 @@ function CloudLibraryPlugin:doClearCloudLog()
     local NetworkMgr = require("ui/network/manager")
     
     if not NetworkMgr:isOnline() then
-        utils.show_msg(_("无网络连接，无法清空"))
+        utils.show_msg(_("No network connection, cannot clear"))
         return
     end
     
-    utils.show_msg(_("正在清空云端同步记录..."))
+    utils.show_msg(_("Clearing cloud sync logs..."))
     
     UIManager:scheduleIn(0, function()
         local sync_log = require("sync_log")
         local success, msg = sync_log.clear_cloud_log()
         
         if success then
-            utils.show_msg(_("云端同步记录已清空"))
+            utils.show_msg(_("Cloud sync logs cleared"))
         else
-            utils.show_msg(_("清空失败: ") .. msg)
+            utils.show_msg(_("Clear failed: ") .. msg)
         end
     end)
 end
@@ -394,76 +399,76 @@ function CloudLibraryPlugin:buildNamingModeMenu()
     local utils = require("utils")
     return {
         {
-            text = _("元数据命名方式"),
+            text = _("Metadata Naming Rules"),
             sub_item_table = {
                 {
-                    text = _("使用文件名"),
+                    text = _("Use Filename"),
                     checked_func = function()
                         return self.settings.metadata_naming_mode == "filename"
                     end,
                     callback = function()
                         self.settings.metadata_naming_mode = "filename"
-                        utils.show_msg(_("元数据使用文件名命名"))
+                        utils.show_msg(_("Metadata naming: Filename"))
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     end
                 },
                 {
-                    text = _("使用书籍标题（默认）"),
+                    text = _("Use Book Title (default)"),
                     checked_func = function()
                         return self.settings.metadata_naming_mode == "metadata"
                     end,
                     callback = function()
                         self.settings.metadata_naming_mode = "metadata"
-                        utils.show_msg(_("元数据使用书籍标题命名"))
+                        utils.show_msg(_("Metadata naming: Book title"))
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     end
                 },
                 {
-                    text = _("使用标题_作者"),
+                    text = _("Use Title_Author"),
                     checked_func = function()
                         return self.settings.metadata_naming_mode == "title_author"
                     end,
                     callback = function()
                         self.settings.metadata_naming_mode = "title_author"
-                        utils.show_msg(_("元数据使用「标题_作者」格式命名"))
+                        utils.show_msg(_("Metadata naming: Title_Author"))
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     end
                 },
             },
         },
         {
-            text = _("书籍命名方式"),
+            text = _("Book Naming Rules"),
             sub_item_table = {
                 {
-                    text = _("使用文件名"),
+                    text = _("Use Filename"),
                     checked_func = function()
                         return self.settings.book_naming_mode == "filename"
                     end,
                     callback = function()
                         self.settings.book_naming_mode = "filename"
-                        utils.show_msg(_("书籍使用文件名命名"))
+                        utils.show_msg(_("Book naming: Filename"))
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     end
                 },
                 {
-                    text = _("使用书籍标题（默认）"),
+                    text = _("Use Book Title (default)"),
                     checked_func = function()
                         return self.settings.book_naming_mode == "title"
                     end,
                     callback = function()
                         self.settings.book_naming_mode = "title"
-                        utils.show_msg(_("书籍使用书籍标题命名"))
+                        utils.show_msg(_("Book naming: Book title"))
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     end
                 },
                 {
-                    text = _("使用标题_作者"),
+                    text = _("Use Title_Author"),
                     checked_func = function()
                         return self.settings.book_naming_mode == "title_author"
                     end,
                     callback = function()
                         self.settings.book_naming_mode = "title_author"
-                        utils.show_msg(_("书籍使用「标题_作者」格式命名"))
+                        utils.show_msg(_("Book naming: Title_Author"))
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     end
                 },
@@ -477,13 +482,13 @@ function CloudLibraryPlugin:chooseBookLocalDir()
     local current_dir = self.settings.book_download_dir
     
     DownloadMgr:new{
-        title = _("选择书籍下载目录"),
+        title = _("Select Book Download Directory"),
         onConfirm = function(path)
             if path and path ~= "" then
                 self.settings.book_download_dir = path
                 G_reader_settings:saveSetting(self.plugin_id, self.settings)
                 UIManager:show(Notification:new{
-                    text = string.format(_("本地下载目录已设置: %s"), path),
+                    text = string.format(_("Book download directory set: %s"), path),
                     timeout = 2
                 })
             end
@@ -494,46 +499,50 @@ end
 function CloudLibraryPlugin:buildMetadataSyncMenu()
     return {
         {
-            text = _("上传当前书籍元数据"),
+            text = _("Upload current book metadata"),
             enabled = self.ui and self.ui.document,
             callback = function()
                 self.manual_sync:syncCurrentBook(true)
             end
         },
         {
-            text = _("下载当前书籍元数据"),
+            text = _("Download current book metadata"),
             sub_item_table = {
                 {
-                    text = _("覆盖更新"),
+                    text = _("Overwrite"),
                     callback = function()
+                        self.settings.manual_download_mode = "override"
+                        G_reader_settings:saveSetting(self.plugin_id, self.settings)
                         self.manual_sync:syncCurrentBook(false)
                     end
                 },
                 {
-                    text = _("合并更新"),
+                    text = _("Merge"),
                     callback = function()
+                        self.settings.manual_download_mode = "merge"
+                        G_reader_settings:saveSetting(self.plugin_id, self.settings)
                         self.manual_sync:syncCurrentBookMerge()
                     end
                 },
             },
         },
         {
-            text = _("批量上传选中书籍元数据"),
+            text = _("Batch upload selected books metadata"),
             callback = function()
                 self.manual_sync:batchSyncWithFMSelection(true, false)
             end,
         },
         {
-            text = _("批量下载选中书籍元数据"),
+            text = _("Batch download selected books metadata"),
             sub_item_table = {
                 {
-                    text = _("覆盖更新"),
+                    text = _("Overwrite"),
                     callback = function()
                         self.manual_sync:batchSyncWithFMSelection(false, false)
                     end
                 },
                 {
-                    text = _("合并更新"),
+                    text = _("Merge"),
                     callback = function()
                         self.manual_sync:batchSyncWithFMSelection(false, true)
                     end
@@ -547,13 +556,13 @@ function CloudLibraryPlugin:buildBookSyncMenu()
     local BookSync = require("book_sync")
     return {
         {
-            text = _("批量上传选中书籍"),
+            text = _("Batch upload selected books"),
             callback = function()
                 BookSync.batchUploadWithFMSelection(self)
             end
         },
         {
-            text = _("批量下载/删除云端书籍"),
+            text = _("Batch download/delete cloud books"),
             callback = function()
                 self:batchDownloadBooks()
             end
@@ -565,50 +574,50 @@ function CloudLibraryPlugin:buildAutoSyncMenu()
     local utils = require("utils")
     return {
         {
-            text = _("自动上传备份"),
+            text = _("Auto Upload Backup"),
             enabled = true,
             sub_item_table = {
                 {
-                    text = _("编辑标注时自动上传"),
+                    text = _("Auto upload when editing annotations"),
                     checked_func = function()
                         return self.settings.auto_upload_on_annotate == true
                     end,
                     callback = function()
                         self.settings.auto_upload_on_annotate = not self.settings.auto_upload_on_annotate
                         self:updateAutoSyncSettings()
-                        utils.show_msg(self.settings.auto_upload_on_annotate and "已开启：编辑标注时自动上传" or "已关闭：编辑标注时自动上传")
+                        utils.show_msg(self.settings.auto_upload_on_annotate and _("Enabled: Auto upload when editing annotations") or _("Disabled: Auto upload when editing annotations"))
                     end,
                 },
                 {
-                    text = _("关闭书籍时自动上传"),
+                    text = _("Auto upload when closing book"),
                     checked_func = function()
                         return self.settings.auto_upload_on_close == true
                     end,
                     callback = function()
                         self.settings.auto_upload_on_close = not self.settings.auto_upload_on_close
                         self:updateAutoSyncSettings()
-                        utils.show_msg(self.settings.auto_upload_on_close and "已开启：关闭书籍时自动上传" or "已关闭：关闭书籍时自动上传")
+                        utils.show_msg(self.settings.auto_upload_on_close and _("Enabled: Auto upload when closing book") or _("Disabled: Auto upload when closing book"))
                     end,
                 },
                 {
-                    text = _("设备休眠时自动上传"),
+                    text = _("Auto upload when device suspends"),
                     checked_func = function()
                         return self.settings.auto_upload_on_suspend == true
                     end,
                     callback = function()
                         self.settings.auto_upload_on_suspend = not self.settings.auto_upload_on_suspend
                         self:updateAutoSyncSettings()
-                        utils.show_msg(self.settings.auto_upload_on_suspend and "已开启：休眠时自动上传" or "已关闭：休眠时自动上传")
+                        utils.show_msg(self.settings.auto_upload_on_suspend and _("Enabled: Auto upload when device suspends") or _("Disabled: Auto upload when device suspends"))
                     end,
                 },
             },
         },
         {
-            text = _("自动下载更新"),
+            text = _("Auto Download Update"),
             enabled = true,
             sub_item_table = {
                 {
-                    text = _("打开书籍时自动下载（覆盖更新）"),
+                    text = _("Auto download when opening book (Overwrite)"),
                     checked_func = function()
                         return self.settings.auto_download_on_open and self.settings.auto_download_mode == "override"
                     end,
@@ -623,11 +632,11 @@ function CloudLibraryPlugin:buildAutoSyncMenu()
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                         local utils = require("utils")
                         utils.show_msg(self.settings.auto_download_on_open and self.settings.auto_download_mode == "override" and 
-                            "已开启：打开书籍时自动下载（覆盖更新）" or "已关闭：打开书籍时自动下载（覆盖更新）")
+                            _("Enabled: Auto download when opening book (Overwrite)") or _("Disabled: Auto download when opening book (Overwrite)"))
                     end,
                 },
                 {
-                    text = _("打开书籍时自动下载（合并更新）"),
+                    text = _("Auto download when opening book (Merge)"),
                     checked_func = function()
                         return self.settings.auto_download_on_open and self.settings.auto_download_mode == "merge"
                     end,
@@ -642,20 +651,20 @@ function CloudLibraryPlugin:buildAutoSyncMenu()
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
                         local utils = require("utils")
                         utils.show_msg(self.settings.auto_download_on_open and self.settings.auto_download_mode == "merge" and 
-                            "已开启：打开书籍时自动下载元数据" or "已关闭：打开书籍时自动下载元数据")
+                            _("Enabled: Auto download when opening book (Merge)") or _("Disabled: Auto download when opening book (Merge)"))
                     end,
                 },
             },
         },
         {
-            text = _("自动同步时显示通知"),
+            text = _("Show notification on auto sync"),
             checked_func = function()
                 return self.settings.auto_sync_notify == true
             end,
             callback = function()
                 self.settings.auto_sync_notify = not self.settings.auto_sync_notify
                 G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                utils.show_msg(self.settings.auto_sync_notify and "已开启：自动同步通知" or "已关闭：自动同步通知")
+                utils.show_msg(self.settings.auto_sync_notify and _("Enabled: Auto sync notifications") or _("Disabled: Auto sync notifications"))
             end,
         },
     }
@@ -665,20 +674,14 @@ function CloudLibraryPlugin:batchDownloadBooks()
     local utils = require("utils")
     local download_dir = self.settings.book_download_dir
     if not download_dir or download_dir == "" then
-        utils.show_msg(_("请先在设置中设置书籍下载目录"))
+        utils.show_msg(_("Please set book download directory in settings first"))
         return
     end
     
     local BookSync = require("book_sync")
-    BookSync.show_cloud_book_dialog(function(book_names)
-        UIManager:show(ConfirmBox:new{
-            text = string.format("确定要下载 %d 本书籍吗？", #book_names),
-            ok_text = _("下载"),
-            cancel_text = _("取消"),
-            ok_callback = function()
-                BookSync.batchDownloadBooks(book_names, self.settings, self)
-            end,
-        })
+    BookSync.show_cloud_book_dialog(function(selected_books)
+        -- selected_books 现在包含 name 和 size 的完整对象
+        BookSync.batchDownloadBooks(selected_books, self.settings, self)
     end, self)
 end
 
@@ -708,25 +711,25 @@ function CloudLibraryPlugin:viewSyncLog()
     
     local f = io.open(log_path, "r")
     if not f then
-        utils.show_msg(_("没有同步记录"))
+        utils.show_msg(_("No sync records"))
         return
     end
     local content = f:read("*all")
     f:close()
     
     if content == "" or not content then
-        utils.show_msg(_("没有同步记录"))
+        utils.show_msg(_("No sync records"))
         return
     end
     
-    local header = string.format("同步记录文件路径: %s\n\n", absolute_path)
+    local header = string.format(_("Sync log file path: %s\n\n"), absolute_path)
     local full_content = header .. content
     
     local textviewer
     local buttons = {
         {
             {
-                text = _("查找"),
+                text = _("Find"),
                 callback = function()
                     if textviewer then
                         textviewer:findDialog()
@@ -734,31 +737,31 @@ function CloudLibraryPlugin:viewSyncLog()
                 end,
             },
             {
-                text = _("复制"),
+                text = _("Copy"),
                 callback = function()
                     if Device:hasClipboard() then
                         Device.input.setClipboardText(full_content)
-                        utils.show_msg(_("同步记录已复制到剪贴板"))
+                        utils.show_msg(_("Sync log copied to clipboard"))
                     else
                         local temp_file = DataStorage:getDataDir() .. "sync_log_backup.txt"
                         local out_f = io.open(temp_file, "w")
                         if out_f then
                             out_f:write(full_content)
                             out_f:close()
-                            utils.show_msg(string.format(_("同步记录已保存到 %s"), temp_file))
+                            utils.show_msg(string.format(_("Sync log saved to %s"), temp_file))
                         else
-                            utils.show_msg(_("复制失败"))
+                            utils.show_msg(_("Copy failed"))
                         end
                     end
                 end,
             },
             {
-                text = _("清空"),
+                text = _("Clear"),
                 callback = function()
                     UIManager:show(ConfirmBox:new{
-                        text = _("确定要清空所有同步记录吗？"),
-                        ok_text = _("清空"),
-                        cancel_text = _("取消"),
+                        text = _("Are you sure you want to clear all sync records?"),
+                        ok_text = _("Clear"),
+                        cancel_text = _("Cancel"),
                         ok_callback = function()
                             local out_f = io.open(log_path, "w")
                             if out_f then
@@ -768,7 +771,7 @@ function CloudLibraryPlugin:viewSyncLog()
                             if textviewer then
                                 UIManager:close(textviewer)
                             end
-                            utils.show_msg(_("同步记录已清空"))
+                            utils.show_msg(_("Sync records cleared"))
                         end,
                     })
                 end,
@@ -793,7 +796,7 @@ function CloudLibraryPlugin:viewSyncLog()
     }
     
     textviewer = TextViewer:new{
-        title = _("同步记录"),
+        title = _("Sync Log"),
         text = full_content,
         justified = false,
         buttons_table = buttons,
@@ -804,8 +807,27 @@ end
 function CloudLibraryPlugin:showPluginInfo()
     local DataStorage = require("datastorage")
     local data_dir = DataStorage:getFullDataDir()
+    local plugin_dir = data_dir .. "/plugins/cloudlibrary.koplugin/"
     
-    local readme_path = data_dir .. "/plugins/cloudlibrary.koplugin/README.md"
+    -- Get current language setting
+    local current_lang = G_reader_settings:readSetting("language") or "en"
+    local is_chinese = current_lang == "zh_CN" or current_lang == "zh-TW" or current_lang:match("^zh")
+    
+    -- Select README file based on language
+    local readme_path
+    if is_chinese then
+        readme_path = plugin_dir .. "README.md"
+        -- Fallback to English if Chinese README doesn't exist
+        if not lfs.attributes(readme_path, "mode") then
+            readme_path = plugin_dir .. "README.en.md"
+        end
+    else
+        readme_path = plugin_dir .. "README.en.md"
+        -- Fallback to Chinese if English README doesn't exist
+        if not lfs.attributes(readme_path, "mode") then
+            readme_path = plugin_dir .. "README.md"
+        end
+    end
     
     local f = io.open(readme_path, "r")
     local content = nil
@@ -815,12 +837,12 @@ function CloudLibraryPlugin:showPluginInfo()
     end
     
     if not content or content == "" then
-        content = _("未找到 README.md 文件")
+        content = _("README file not found")
     end
     
     local TextViewer = require("ui/widget/textviewer")
     local textviewer = TextViewer:new{
-        title = _("云端书库 插件说明"),
+        title = _("Cloud Library Plugin Info"),
         text = content,
         justified = false,
     }
@@ -831,84 +853,84 @@ function CloudLibraryPlugin:onDispatcherRegisterActions()
     Dispatcher:registerAction("cloudlibrary_reader", {
         category = "none",
         event = "CloudLibraryReader",
-        title = _("云端书库-快捷操作"),
+        title = _("Cloud Library - Quick Actions"),
         reader = true,
     })
     
     Dispatcher:registerAction("cloudlibrary_filemanager", {
         category = "none",
         event = "CloudLibraryFileManager",
-        title = _("云端书库-快捷操作"),
+        title = _("Cloud Library - Quick Actions"),
         filemanager = true,
     })
 
     Dispatcher:registerAction("cloudlibrary_settings_reader", {
         category = "none",
         event = "CloudLibrarySettingsReader",
-        title = _("云端书库-快捷设置"),
+        title = _("Cloud Library - Quick Settings"),
         reader = true,
     })
 
     Dispatcher:registerAction("cloudlibrary_settings_filemanager", {
         category = "none",
         event = "CloudLibrarySettingsFileManager",
-        title = _("云端书库-快捷设置"),
+        title = _("Cloud Library - Quick Settings"),
         filemanager = true,
     })
 
     Dispatcher:registerAction("cloudlibrary_upload_current", {
         category = "none",
         event = "CloudLibraryUploadCurrent",
-        title = _("云端书库-上传当前书籍元数据"),
+        title = _("Cloud Library - Upload current book metadata"),
         reader = true,
     })
     
     Dispatcher:registerAction("cloudlibrary_download_current", {
         category = "none",
         event = "CloudLibraryDownloadCurrent",
-        title = _("云端书库-下载当前书籍元数据（智能模式）"),
+        title = _("Cloud Library - Download current book metadata (Smart mode)"),
         reader = true,
     })
     
     Dispatcher:registerAction("cloudlibrary_autosync_reader", {
         category = "none",
         event = "CloudLibraryAutoSyncReader",
-        title = _("云端书库-元数据省心同步模式"),
+        title = _("Cloud Library - Worry-Free Sync Mode"),
         reader = true,
     })
 
     Dispatcher:registerAction("cloudlibrary_autosync_filemanager", {
         category = "none",
         event = "CloudLibraryAutoSyncFileManager",
-        title = _("云端书库-元数据省心同步模式"),
+        title = _("Cloud Library - Worry-Free Sync Mode"),
         filemanager = true,
     })
 
     Dispatcher:registerAction("cloudlibrary_batch_upload_metadata", {
         category = "none",
         event = "CloudLibraryBatchUploadMetadata",
-        title = _("云端书库-批量上传选中书籍元数据"),
+        title = _("Cloud Library - Batch upload selected books metadata"),
         filemanager = true,
     })
     
     Dispatcher:registerAction("cloudlibrary_batch_download_metadata_smart", {
         category = "none",
         event = "CloudLibraryBatchDownloadMetadataSmart",
-        title = _("云端书库-批量下载元数据（智能模式）"),
+        title = _("Cloud Library - Batch download metadata (Smart mode)"),
         filemanager = true,
     })
     
     Dispatcher:registerAction("cloudlibrary_batch_upload_books", {
         category = "none",
         event = "CloudLibraryBatchUploadBooks",
-        title = _("云端书库-批量上传选中书籍文件"),
+        title = _("Cloud Library - Batch upload selected books"),
         filemanager = true,
     })
     
     Dispatcher:registerAction("cloudlibrary_batch_download_books", {
         category = "none",
         event = "CloudLibraryBatchDownloadBooks",
-        title = _("云端书库-批量下载/删除云端书籍文件"),
+        title = _("Cloud Library - Batch download/delete cloud books"),
         filemanager = true,
     })
 end
@@ -924,95 +946,100 @@ end
 function CloudLibraryPlugin:showSyncDialog(context)
     local buttons = {}
     local BookSync = require("book_sync")
-    local mode_text = (self.settings.auto_download_mode == "merge") and "合并更新" or "覆盖更新"
+    local mode_text = (self.settings.manual_download_mode == "merge") and _("Merge") or _("Overwrite")
     
-    if context == "reader" then
-        buttons = {
-            { 
-                { text = _("上传当前书籍元数据"), callback = function()
+if context == "reader" then
+    buttons = {
+        { 
+            { text = _("Upload current book metadata"), callback = function()
+                if self._current_dialog then
+                    UIManager:close(self._current_dialog)
+                    self._current_dialog = nil
+                end
+                self.manual_sync:syncCurrentBook(true)
+            end } 
+        },
+        { 
+            { text = string.format(_("Download current book metadata (%s)"), mode_text), callback = function()
+                if self._current_dialog then
+                    UIManager:close(self._current_dialog)
+                    self._current_dialog = nil
+                end
+                -- 改为 manual_download_mode
+                if self.settings.manual_download_mode == "merge" then
+                    self.manual_sync:syncCurrentBookMerge()
+                else
+                    self.manual_sync:syncCurrentBook(false)
+                end
+            end } 
+        },
+        { 
+            { text = _("View Sync Log"), callback = function()
+                if self._current_dialog then
+                    UIManager:close(self._current_dialog)
+                    self._current_dialog = nil
+                end
+                self:viewSyncLog()
+            end } 
+        },
+    }
+else
+    buttons = {
+        { 
+            { text = _("Batch upload selected books metadata"), callback = function()
+                if self._current_dialog then
+                    UIManager:close(self._current_dialog)
+                    self._current_dialog = nil
+                end
+                self.manual_sync:batchSyncWithFMSelection(true, false)
+            end } 
+        },
+        { 
+            {
+                text = string.format(_("Batch download selected books metadata (%s)"), 
+                    (self.settings.manual_download_mode == "merge") and _("Merge") or _("Overwrite")),
+                callback = function()
                     if self._current_dialog then
                         UIManager:close(self._current_dialog)
                         self._current_dialog = nil
                     end
-                    self.manual_sync:syncCurrentBook(true)
-                end } 
-            },
-            { 
-                { text = string.format(_("下载当前书籍元数据（%s）"), mode_text), callback = function()
-                    if self._current_dialog then
-                        UIManager:close(self._current_dialog)
-                        self._current_dialog = nil
-                    end
-                    if self.settings.auto_download_mode == "merge" then
-                        self.manual_sync:syncCurrentBookMerge()
-                    else
-                        self.manual_sync:syncCurrentBook(false)
-                    end
-                end } 
-            },
-            { 
-                { text = _("查看同步记录"), callback = function()
-                    if self._current_dialog then
-                        UIManager:close(self._current_dialog)
-                        self._current_dialog = nil
-                    end
-                    self:viewSyncLog()
-                end } 
-            },
-        }
-    else
-        buttons = {
-            { 
-                { text = _("批量上传选中书籍元数据"), callback = function()
-                    if self._current_dialog then
-                        UIManager:close(self._current_dialog)
-                        self._current_dialog = nil
-                    end
-                    self.manual_sync:batchSyncWithFMSelection(true, false)
-                end } 
-            },
-            { 
-                { text = string.format(_("批量下载选中书籍元数据（%s）"), mode_text), callback = function()
-                    if self._current_dialog then
-                        UIManager:close(self._current_dialog)
-                        self._current_dialog = nil
-                    end
-                    local is_merge = (self.settings.auto_download_mode == "merge")
+                    local is_merge = (self.settings.manual_download_mode == "merge")
                     self.manual_sync:batchSyncWithFMSelection(false, is_merge)
-                end } 
-            },
-            { 
-                { text = _("批量上传选中书籍"), callback = function()
-                    if self._current_dialog then
-                        UIManager:close(self._current_dialog)
-                        self._current_dialog = nil
-                    end
-                    BookSync.batchUploadWithFMSelection(self)
-                end } 
-            },
-            { 
-                { text = _("批量下载/删除云端书籍"), callback = function()
-                    if self._current_dialog then
-                        UIManager:close(self._current_dialog)
-                        self._current_dialog = nil
-                    end
-                    self:batchDownloadBooks()
-                end } 
-            },
-            { 
-                { text = _("查看同步记录"), callback = function()
-                    if self._current_dialog then
-                        UIManager:close(self._current_dialog)
-                        self._current_dialog = nil
-                    end
-                    self:viewSyncLog()
-                end } 
-            },
-        }
-    end
+                end
+            } 
+        },
+        { 
+            { text = _("Batch upload selected books"), callback = function()
+                if self._current_dialog then
+                    UIManager:close(self._current_dialog)
+                    self._current_dialog = nil
+                end
+                BookSync.batchUploadWithFMSelection(self)
+            end } 
+        },
+        { 
+            { text = _("Batch download/delete cloud books"), callback = function()
+                if self._current_dialog then
+                    UIManager:close(self._current_dialog)
+                    self._current_dialog = nil
+                end
+                self:batchDownloadBooks()
+            end } 
+        },
+        { 
+            { text = _("View Sync Log"), callback = function()
+                if self._current_dialog then
+                    UIManager:close(self._current_dialog)
+                    self._current_dialog = nil
+                end
+                self:viewSyncLog()
+            end } 
+        },
+    }
+end
     
     local dialog = ButtonDialog:new{
-        title = _("云端书库-快捷操作"),
+        title = _("Cloud Library - Quick Actions"),
         title_align = "center",
         buttons = buttons,
         width = math.floor(Screen:getWidth() * 0.6),
@@ -1029,7 +1056,7 @@ end
 
 function CloudLibraryPlugin:onCloudLibraryDownloadCurrent()
     if self.ui and self.ui.document then
-        if self.settings.auto_download_mode == "merge" then
+        if self.settings.manual_download_mode == "merge" then
             self.manual_sync:syncCurrentBookMerge()
         else
             self.manual_sync:syncCurrentBook(false)
@@ -1069,9 +1096,9 @@ function CloudLibraryPlugin:showSettingsDialog(context)
                 local remote = require("remote")
                 local server = remote.get_server()
                 if server and server.url then
-                    return _("元数据云端目录: ") .. server.url
+                    return _("Metadata Cloud Directory: ") .. server.url
                 else
-                    return _("设置元数据云端目录")
+                    return _("Set Metadata Cloud Directory")
                 end
             end,
             callback = function()
@@ -1095,9 +1122,9 @@ function CloudLibraryPlugin:showSettingsDialog(context)
             text_func = function()
                 local book_dir = self.settings.book_cloud_dir
                 if book_dir and book_dir ~= "" then
-                    return _("书籍云端目录: ") .. book_dir
+                    return _("Book Cloud Directory: ") .. book_dir
                 else
-                    return _("设置书籍云端目录（默认与元数据相同）")
+                    return _("Set Book Cloud Directory (defaults to metadata directory)")
                 end
             end,
             callback = function()
@@ -1115,16 +1142,16 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     local metadata_naming_mode = self.settings.metadata_naming_mode or "metadata"
     local metadata_naming_text = ""
     if metadata_naming_mode == "filename" then
-        metadata_naming_text = "使用文件名"
+        metadata_naming_text = _("Use Filename")
     elseif metadata_naming_mode == "metadata" then
-        metadata_naming_text = "使用书籍标题"
+        metadata_naming_text = _("Use Book Title")
     elseif metadata_naming_mode == "title_author" then
-        metadata_naming_text = "使用标题_作者"
+        metadata_naming_text = _("Use Title_Author")
     end
     
     table.insert(buttons, {
         {
-            text = _("元数据命名方式: ") .. metadata_naming_text,
+            text = _("Metadata Naming Rules: ") .. metadata_naming_text,
             callback = function()
                 self:showMetadataNamingModeDialog()
                 if self_ref._current_settings_dialog then
@@ -1138,16 +1165,16 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     local book_naming_mode = self.settings.book_naming_mode or "title"
     local book_naming_text = ""
     if book_naming_mode == "filename" then
-        book_naming_text = "使用文件名"
+        book_naming_text = _("Use Filename")
     elseif book_naming_mode == "title" then
-        book_naming_text = "使用书籍标题"
+        book_naming_text = _("Use Book Title")
     elseif book_naming_mode == "title_author" then
-        book_naming_text = "使用标题_作者"
+        book_naming_text = _("Use Title_Author")
     end
     
     table.insert(buttons, {
         {
-            text = _("书籍命名方式: ") .. book_naming_text,
+            text = _("Book Naming Rules: ") .. book_naming_text,
             callback = function()
                 self:showBookNamingModeDialog()
                 if self_ref._current_settings_dialog then
@@ -1163,9 +1190,9 @@ function CloudLibraryPlugin:showSettingsDialog(context)
             text_func = function()
                 local dir = self.settings.book_download_dir
                 if dir and dir ~= "" then
-                    return _("书籍下载目录: ") .. dir
+                    return _("Book Download Directory: ") .. dir
                 else
-                    return _("设置书籍下载目录")
+                    return _("Set Book Download Directory")
                 end
             end,
             callback = function()
@@ -1178,10 +1205,10 @@ function CloudLibraryPlugin:showSettingsDialog(context)
         }
     })
     
-    local download_mode_text = (self.settings.auto_download_mode == "merge") and "合并更新" or "覆盖更新"
+    local download_mode_text = (self.settings.manual_download_mode == "merge") and _("Merge") or _("Overwrite")
     table.insert(buttons, {
         {
-            text = _("元数据下载模式（手动）: ") .. download_mode_text,
+            text = _("Metadata Download Mode (Manual): ") .. download_mode_text,
             callback = function()
                 self:showManualDownloadModeDialog()
                 if self_ref._current_settings_dialog then
@@ -1197,7 +1224,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.auto_upload_on_annotate and "✓ " or "  ") .. _("编辑标注时自动上传元数据")
+                return (self.settings.auto_upload_on_annotate and "✓ " or "  ") .. _("Auto upload when editing annotations")
             end,
             callback = function()
                 self.settings.auto_upload_on_annotate = not self.settings.auto_upload_on_annotate
@@ -1211,7 +1238,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.auto_upload_on_close and "✓ " or "  ") .. _("关闭书籍时自动上传元数据")
+                return (self.settings.auto_upload_on_close and "✓ " or "  ") .. _("Auto upload when closing book")
             end,
             callback = function()
                 self.settings.auto_upload_on_close = not self.settings.auto_upload_on_close
@@ -1225,7 +1252,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.auto_upload_on_suspend and "✓ " or "  ") .. _("设备休眠时自动上传元数据")
+                return (self.settings.auto_upload_on_suspend and "✓ " or "  ") .. _("Auto upload when device suspends")
             end,
             callback = function()
                 self.settings.auto_upload_on_suspend = not self.settings.auto_upload_on_suspend
@@ -1242,7 +1269,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
         {
             text_func = function()
                 local enabled = self.settings.auto_download_on_open and self.settings.auto_download_mode == "override"
-                return (enabled and "✓ " or "  ") .. _("打开书籍时自动下载元数据（覆盖更新）")
+                return (enabled and "✓ " or "  ") .. _("Auto download when opening book (Overwrite)")
             end,
             callback = function()
                 if self.settings.auto_download_on_open and self.settings.auto_download_mode == "override" then
@@ -1262,7 +1289,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
         {
             text_func = function()
                 local enabled = self.settings.auto_download_on_open and self.settings.auto_download_mode == "merge"
-                return (enabled and "✓ " or "  ") .. _("打开书籍时自动下载元数据（合并更新）")
+                return (enabled and "✓ " or "  ") .. _("Auto download when opening book (Merge)")
             end,
             callback = function()
                 if self.settings.auto_download_on_open and self.settings.auto_download_mode == "merge" then
@@ -1283,7 +1310,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.upload_json and not self.settings.use_notemark_format and "✓ " or "  ") .. _("额外备份JSON文件（原始格式）")
+                return (self.settings.upload_json and not self.settings.use_notemark_format and "✓ " or "  ") .. _("Additional JSON Backup (Original format)")
             end,
             callback = function()
                 if self.settings.upload_json and not self.settings.use_notemark_format then
@@ -1302,7 +1329,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.upload_json and self.settings.use_notemark_format and "✓ " or "  ") .. _("额外备份JSON文件（NoteMarkData格式）")
+                return (self.settings.upload_json and self.settings.use_notemark_format and "✓ " or "  ") .. _("Additional JSON Backup (NoteMarkData format)")
             end,
             callback = function()
                 if self.settings.upload_json and self.settings.use_notemark_format then
@@ -1323,7 +1350,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.override_keep_local_settings and "✓ " or "  ") .. _("覆盖更新时保留本地文档设置")
+                return (self.settings.override_keep_local_settings and "✓ " or "  ") .. _("Keep local document settings when overwriting")
             end,
             callback = function()
                 self.settings.override_keep_local_settings = not self.settings.override_keep_local_settings
@@ -1336,7 +1363,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.sync_log_enabled and "✓ " or "  ") .. _("开启记录云同步")
+                return (self.settings.sync_log_enabled and "✓ " or "  ") .. _("Enable Cloud Sync Log")
             end,
             callback = function()
                 self.settings.sync_log_enabled = not self.settings.sync_log_enabled
@@ -1353,7 +1380,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                return (self.settings.auto_sync_notify and "✓ " or "  ") .. _("自动同步时显示通知")
+                return (self.settings.auto_sync_notify and "✓ " or "  ") .. _("Show notification on auto sync")
             end,
             callback = function()
                 self.settings.auto_sync_notify = not self.settings.auto_sync_notify
@@ -1367,7 +1394,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     
     table.insert(buttons, {
         {
-            text = _("查看同步记录"),
+            text = _("View Sync Log"),
             callback = function()
                 self:viewSyncLog()
                 if self_ref._current_settings_dialog then
@@ -1380,7 +1407,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     
     table.insert(buttons, {
         {
-            text = _("清空云端同步记录"),
+            text = _("Clear Cloud Sync Log"),
             callback = function()
                 self:confirmClearCloudLog()
                 if self_ref._current_settings_dialog then
@@ -1393,7 +1420,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     
     table.insert(buttons, {
         {
-            text = _("插件说明"),
+            text = _("Plugin Info"),
             callback = function()
                 self:showPluginInfo()
                 if self_ref._current_settings_dialog then
@@ -1406,7 +1433,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     
     table.insert(buttons, {
         {
-            text = _("检查更新") .. "  (作者：gytwo  当前版本: " .. self.VERSION .. ")",
+            text = _("Updates") .. "  (" .. _("Author") .. ": gytwo  " .. _("Current version") .. ": " .. self.VERSION .. ")",
             callback = function()
                 local update = require("update")
                 update.check_for_updates(false, self)
@@ -1419,7 +1446,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     })
     
     local dialog = ButtonDialog:new{
-        title = _("云端书库-快捷设置"),
+        title = _("Cloud Library - Quick Settings"),
         title_align = "center",
         buttons = buttons,
         width = math.floor(Screen:getWidth() * 0.7),
@@ -1441,12 +1468,12 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
     local buttons = {
         {
             {
-                text = (current_mode == "filename" and "✓ " or "  ") .. _("使用文件名"),
+                text = (current_mode == "filename" and "✓ " or "  ") .. _("Use Filename"),
                 callback = function()
                     self.settings.metadata_naming_mode = "filename"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("元数据使用文件名命名"))
+                    utils.show_msg(_("Metadata naming: Filename"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1455,12 +1482,12 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
         },
         {
             {
-                text = (current_mode == "metadata" and "✓ " or "  ") .. _("使用书籍标题（默认）"),
+                text = (current_mode == "metadata" and "✓ " or "  ") .. _("Use Book Title (default)"),
                 callback = function()
                     self.settings.metadata_naming_mode = "metadata"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("元数据使用书籍标题命名"))
+                    utils.show_msg(_("Metadata naming: Book title"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1469,12 +1496,12 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
         },
         {
             {
-                text = (current_mode == "title_author" and "✓ " or "  ") .. _("使用标题_作者"),
+                text = (current_mode == "title_author" and "✓ " or "  ") .. _("Use Title_Author"),
                 callback = function()
                     self.settings.metadata_naming_mode = "title_author"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("元数据使用「标题_作者」格式命名"))
+                    utils.show_msg(_("Metadata naming: Title_Author"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1484,7 +1511,7 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
         {},
         {
             {
-                text = _("返回"),
+                text = _("Back"),
                 callback = function()
                     if dialog then
                         UIManager:close(dialog)
@@ -1495,7 +1522,7 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
     }
     
     dialog = ButtonDialog:new{
-        title = _("元数据命名方式"),
+        title = _("Metadata Naming Rules"),
         title_align = "center",
         buttons = buttons,
         width = math.floor(Screen:getWidth() * 0.7),
@@ -1515,12 +1542,12 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
     local buttons = {
         {
             {
-                text = (current_mode == "filename" and "✓ " or "  ") .. _("使用文件名"),
+                text = (current_mode == "filename" and "✓ " or "  ") .. _("Use Filename"),
                 callback = function()
                     self.settings.book_naming_mode = "filename"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("书籍使用文件名命名"))
+                    utils.show_msg(_("Book naming: Filename"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1529,12 +1556,12 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
         },
         {
             {
-                text = (current_mode == "title" and "✓ " or "  ") .. _("使用书籍标题（默认）"),
+                text = (current_mode == "title" and "✓ " or "  ") .. _("Use Book Title (default)"),
                 callback = function()
                     self.settings.book_naming_mode = "title"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("书籍使用书籍标题命名"))
+                    utils.show_msg(_("Book naming: Book title"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1543,12 +1570,12 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
         },
         {
             {
-                text = (current_mode == "title_author" and "✓ " or "  ") .. _("使用标题_作者"),
+                text = (current_mode == "title_author" and "✓ " or "  ") .. _("Use Title_Author"),
                 callback = function()
                     self.settings.book_naming_mode = "title_author"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("书籍使用「标题_作者」格式命名"))
+                    utils.show_msg(_("Book naming: Title_Author"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1558,7 +1585,7 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
         {},
         {
             {
-                text = _("返回"),
+                text = _("Back"),
                 callback = function()
                     if dialog then
                         UIManager:close(dialog)
@@ -1569,7 +1596,7 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
     }
     
     dialog = ButtonDialog:new{
-        title = _("书籍命名方式"),
+        title = _("Book Naming Rules"),
         title_align = "center",
         buttons = buttons,
         width = math.floor(Screen:getWidth() * 0.7),
@@ -1583,18 +1610,19 @@ function CloudLibraryPlugin:showManualDownloadModeDialog()
     local Screen = Device.screen
     local _ = require("gettext")
     
-    local current_mode = self.settings.auto_download_mode or "merge"
+    -- 改为 manual_download_mode
+    local current_mode = self.settings.manual_download_mode or "merge"
     
     local dialog
     local buttons = {
         {
             {
-                text = (current_mode == "override" and "✓ " or "  ") .. _("覆盖更新"),
+                text = (current_mode == "override" and "✓ " or "  ") .. _("Overwrite"),
                 callback = function()
-                    self.settings.auto_download_mode = "override"
+                    self.settings.manual_download_mode = "override"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("元数据下载模式（手动）：覆盖更新"))
+                    utils.show_msg(_("Metadata download mode (manual): Overwrite"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1603,12 +1631,12 @@ function CloudLibraryPlugin:showManualDownloadModeDialog()
         },
         {
             {
-                text = (current_mode == "merge" and "✓ " or "  ") .. _("合并更新"),
+                text = (current_mode == "merge" and "✓ " or "  ") .. _("Merge"),
                 callback = function()
-                    self.settings.auto_download_mode = "merge"
+                    self.settings.manual_download_mode = "merge"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
                     local utils = require("utils")
-                    utils.show_msg(_("元数据下载模式（手动）：合并更新"))
+                    utils.show_msg(_("Metadata download mode (manual): Merge"))
                     if dialog then
                         UIManager:close(dialog)
                     end
@@ -1618,7 +1646,7 @@ function CloudLibraryPlugin:showManualDownloadModeDialog()
         {},
         {
             {
-                text = _("返回"),
+                text = _("Back"),
                 callback = function()
                     if dialog then
                         UIManager:close(dialog)
@@ -1629,7 +1657,7 @@ function CloudLibraryPlugin:showManualDownloadModeDialog()
     }
     
     dialog = ButtonDialog:new{
-        title = _("元数据下载模式（手动）"),
+        title = _("Metadata Download Mode (Manual)"),
         title_align = "center",
         buttons = buttons,
         width = math.floor(Screen:getWidth() * 0.7),
@@ -1642,7 +1670,7 @@ function CloudLibraryPlugin:onCloudLibraryBatchUploadMetadata()
 end
 
 function CloudLibraryPlugin:onCloudLibraryBatchDownloadMetadataSmart()
-    local is_merge = (self.settings.auto_download_mode == "merge")
+    local is_merge = (self.settings.manual_download_mode == "merge")
     self.manual_sync:batchSyncWithFMSelection(false, is_merge)
 end
 
@@ -1679,7 +1707,7 @@ function CloudLibraryPlugin:toggleAutoSyncQuick()
         G_reader_settings:saveSetting(self.plugin_id, self.settings)
         
         local utils = require("utils")
-        utils.show_msg(_("云端书库: 已关闭所有元数据自动同步"))
+        utils.show_msg(_("Cloud Library: All auto sync disabled"))
     else
         self.settings.auto_upload_on_annotate = false
         self.settings.auto_upload_on_close = true
@@ -1691,7 +1719,7 @@ function CloudLibraryPlugin:toggleAutoSyncQuick()
         G_reader_settings:saveSetting(self.plugin_id, self.settings)
         
         local utils = require("utils")
-        utils.show_msg(_("云端书库: 已开启元数据省心同步模式 (关闭书籍/设备休眠自动上传 + 打开书籍自动合并更新)"))
+        utils.show_msg(_("Cloud Library: Worry-Free Sync Mode enabled (auto upload on close/suspend + auto download merge on open)"))
     end
 end
 
