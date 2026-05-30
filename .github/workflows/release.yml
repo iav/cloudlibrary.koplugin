@@ -57,6 +57,7 @@ jobs:
       - name: Build release notes
         if: steps.version_check.outputs.skip == 'false'
         run: |
+          cd $GITHUB_WORKSPACE   # 回到工作区根目录
           VERSION="${{ steps.meta.outputs.version }}"
           python3 - "$VERSION" <<'PYEOF' > release_notes.md
           import re, sys
