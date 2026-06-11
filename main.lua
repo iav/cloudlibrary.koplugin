@@ -75,15 +75,15 @@ function CloudLibraryPlugin:init()
     
     self.ui.menu:registerToMainMenu(self)
     
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     utils.insert_after_statistics(self.plugin_id)
     self:onDispatcherRegisterActions()
     
     self.settings = G_reader_settings:readSetting(self.plugin_id, self.default_settings)
     
-    local AutoSync = require("auto_sync")
-    local ManualSync = require("manual_sync")
-    local Hooks = require("hooks")
+    local AutoSync = dofile(_plugin_dir .. "auto_sync.lua")
+    local ManualSync = dofile(_plugin_dir .. "manual_sync.lua")
+    local Hooks = dofile(_plugin_dir .. "hooks.lua")
     
     if not CloudLibraryPlugin._auto_sync then
         self.auto_sync = AutoSync:new(self, self.settings)
@@ -124,7 +124,7 @@ function CloudLibraryPlugin:addToMainMenu(menu_items)
 end
 
 function CloudLibraryPlugin:buildMenuItems()
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     local items = {
         {
             text = _("Settings"),
@@ -154,7 +154,7 @@ function CloudLibraryPlugin:buildMenuItems()
         {
             text = _("Updates") .. "  (" .. _("Author") .. ": gytwo  " .. _("Current version") .. ": " .. self.VERSION .. ")",
             callback = function()
-                local update = require("update")
+                local update = dofile(_plugin_dir .. "update.lua")
                 update.check_for_updates(false, self)
             end
         },
@@ -179,7 +179,7 @@ function CloudLibraryPlugin:buildMenuItems()
 end
 
 function CloudLibraryPlugin:buildSettingsMenu()
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     return {
         {
             text = _("Cloud Directory"),
@@ -301,7 +301,7 @@ function CloudLibraryPlugin:buildSettingsMenu()
                 G_reader_settings:saveSetting(self.plugin_id, self.settings)
                 
                 if self.settings.sync_log_enabled then
-                    local sync_log = require("sync_log")
+                    local sync_log = dofile(_plugin_dir .. "sync_log.lua")
                     sync_log.sync_log()
                     utils.show_msg(_("Cloud sync log enabled"))
                 else
@@ -324,7 +324,7 @@ function CloudLibraryPlugin:buildCloudDirMenu()
     return {
         {
             text_func = function()
-                local remote = require("remote")
+                local remote = dofile(_plugin_dir .. "remote.lua")
                 local server = remote.get_server()
                 if server and server.url then
                     return _("Metadata Cloud Directory: ") .. server.url
@@ -334,7 +334,7 @@ function CloudLibraryPlugin:buildCloudDirMenu()
             end,
             callback = function()
                 local SyncService = require("apps/cloudstorage/syncservice")
-                local remote = require("remote")
+                local remote = dofile(_plugin_dir .. "remote.lua")
                 local sync_service = SyncService:new{}
                 sync_service.onConfirm = function(server)
                     remote.save_server_settings(server)
@@ -360,7 +360,7 @@ end
 
 function CloudLibraryPlugin:chooseBookCloudDir()
     local SyncService = require("apps/cloudstorage/syncservice")
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     
     local current_server = remote.get_server()
     
@@ -396,7 +396,7 @@ function CloudLibraryPlugin:confirmClearCloudLog()
 end
 
 function CloudLibraryPlugin:doClearCloudLog()
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     local NetworkMgr = require("ui/network/manager")
     
     if not NetworkMgr:isOnline() then
@@ -407,7 +407,7 @@ function CloudLibraryPlugin:doClearCloudLog()
     utils.show_msg(_("Clearing cloud sync logs..."))
     
     UIManager:scheduleIn(0, function()
-        local sync_log = require("sync_log")
+        local sync_log = dofile(_plugin_dir .. "sync_log.lua")
         local success, msg = sync_log.clear_cloud_log()
         
         if success then
@@ -419,7 +419,7 @@ function CloudLibraryPlugin:doClearCloudLog()
 end
 
 function CloudLibraryPlugin:buildNamingModeMenu()
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     return {
         {
             text = _("Metadata Naming Rules"),
@@ -576,7 +576,7 @@ function CloudLibraryPlugin:buildMetadataSyncMenu()
 end
 
 function CloudLibraryPlugin:buildBookSyncMenu()
-    local BookSync = require("book_sync")
+    local BookSync = dofile(_plugin_dir .. "book_sync.lua")
     return {
         {
             text = _("Batch upload selected books"),
@@ -594,7 +594,7 @@ function CloudLibraryPlugin:buildBookSyncMenu()
 end
 
 function CloudLibraryPlugin:buildAutoSyncMenu()
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     return {
         {
             text = _("Auto Upload Backup"),
@@ -653,7 +653,7 @@ function CloudLibraryPlugin:buildAutoSyncMenu()
                         end
                         self:updateAutoSyncSettings()
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                        local utils = require("utils")
+                        local utils = dofile(_plugin_dir .. "utils.lua")
                         utils.show_msg(self.settings.auto_download_on_open and self.settings.auto_download_mode == "override" and 
                             _("Enabled: Auto download when opening book (Overwrite)") or _("Disabled: Auto download when opening book (Overwrite)"))
                     end,
@@ -672,7 +672,7 @@ function CloudLibraryPlugin:buildAutoSyncMenu()
                         end
                         self:updateAutoSyncSettings()
                         G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                        local utils = require("utils")
+                        local utils = dofile(_plugin_dir .. "utils.lua")
                         utils.show_msg(self.settings.auto_download_on_open and self.settings.auto_download_mode == "merge" and 
                             _("Enabled: Auto download when opening book (Merge)") or _("Disabled: Auto download when opening book (Merge)"))
                     end,
@@ -694,14 +694,14 @@ function CloudLibraryPlugin:buildAutoSyncMenu()
 end
 
 function CloudLibraryPlugin:batchDownloadBooks()
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     local download_dir = self.settings.book_download_dir
     if not download_dir or download_dir == "" then
         utils.show_msg(_("Please set book download directory in settings first"))
         return
     end
     
-    local BookSync = require("book_sync")
+    local BookSync = dofile(_plugin_dir .. "book_sync.lua")
     BookSync.show_cloud_book_dialog(function(selected_books)
         -- selected_books 现在包含 name 和 size 的完整对象
         BookSync.batchDownloadBooks(selected_books, self.settings, self)
@@ -720,7 +720,7 @@ function CloudLibraryPlugin:updateAutoSyncSettings()
 end
 
 function CloudLibraryPlugin:viewSyncLog()
-    local utils = require("utils")
+    local utils = dofile(_plugin_dir .. "utils.lua")
     local log_path = utils.get_log_path()
     
     local realpath = require("ffi/util").realpath
@@ -968,7 +968,7 @@ end
 
 function CloudLibraryPlugin:showSyncDialog(context)
     local buttons = {}
-    local BookSync = require("book_sync")
+    local BookSync = dofile(_plugin_dir .. "book_sync.lua")
     local mode_text = (self.settings.manual_download_mode == "merge") and _("Merge") or _("Overwrite")
     
 if context == "reader" then
@@ -1116,7 +1116,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
     table.insert(buttons, {
         {
             text_func = function()
-                local remote = require("remote")
+                local remote = dofile(_plugin_dir .. "remote.lua")
                 local server = remote.get_server()
                 if server and server.url then
                     return _("Metadata Cloud Directory: ") .. server.url
@@ -1126,7 +1126,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
             end,
             callback = function()
                 local SyncService = require("apps/cloudstorage/syncservice")
-                local remote = require("remote")
+                local remote = dofile(_plugin_dir .. "remote.lua")
                 local sync_service = SyncService:new{}
                 sync_service.onConfirm = function(server)
                     remote.save_server_settings(server)
@@ -1392,7 +1392,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
                 self.settings.sync_log_enabled = not self.settings.sync_log_enabled
                 G_reader_settings:saveSetting(self.plugin_id, self.settings)
                 if self.settings.sync_log_enabled then
-                    local sync_log = require("sync_log")
+                    local sync_log = dofile(_plugin_dir .. "sync_log.lua")
                     sync_log.sync_log()
                 end
                 rebuildAndShow()
@@ -1458,7 +1458,7 @@ function CloudLibraryPlugin:showSettingsDialog(context)
         {
             text = _("Updates") .. "  (" .. _("Author") .. ": gytwo  " .. _("Current version") .. ": " .. self.VERSION .. ")",
             callback = function()
-                local update = require("update")
+                local update = dofile(_plugin_dir .. "update.lua")
                 update.check_for_updates(false, self)
                 if self_ref._current_settings_dialog then
                     UIManager:close(self_ref._current_settings_dialog)
@@ -1495,7 +1495,7 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
                 callback = function()
                     self.settings.metadata_naming_mode = "filename"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Metadata naming: Filename"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1509,7 +1509,7 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
                 callback = function()
                     self.settings.metadata_naming_mode = "metadata"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Metadata naming: Book title"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1523,7 +1523,7 @@ function CloudLibraryPlugin:showMetadataNamingModeDialog()
                 callback = function()
                     self.settings.metadata_naming_mode = "title_author"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Metadata naming: Title_Author"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1569,7 +1569,7 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
                 callback = function()
                     self.settings.book_naming_mode = "filename"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Book naming: Filename"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1583,7 +1583,7 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
                 callback = function()
                     self.settings.book_naming_mode = "title"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Book naming: Book title"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1597,7 +1597,7 @@ function CloudLibraryPlugin:showBookNamingModeDialog()
                 callback = function()
                     self.settings.book_naming_mode = "title_author"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Book naming: Title_Author"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1644,7 +1644,7 @@ function CloudLibraryPlugin:showManualDownloadModeDialog()
                 callback = function()
                     self.settings.manual_download_mode = "override"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Metadata download mode (manual): Overwrite"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1658,7 +1658,7 @@ function CloudLibraryPlugin:showManualDownloadModeDialog()
                 callback = function()
                     self.settings.manual_download_mode = "merge"
                     G_reader_settings:saveSetting(self.plugin_id, self.settings)
-                    local utils = require("utils")
+                    local utils = dofile(_plugin_dir .. "utils.lua")
                     utils.show_msg(_("Metadata download mode (manual): Merge"))
                     if dialog then
                         UIManager:close(dialog)
@@ -1698,7 +1698,7 @@ function CloudLibraryPlugin:onCloudLibraryBatchDownloadMetadataSmart()
 end
 
 function CloudLibraryPlugin:onCloudLibraryBatchUploadBooks()
-    local BookSync = require("book_sync")
+    local BookSync = dofile(_plugin_dir .. "book_sync.lua")
     BookSync.batchUploadWithFMSelection(self)
 end
 
@@ -1729,7 +1729,7 @@ function CloudLibraryPlugin:toggleAutoSyncQuick()
         self:updateAutoSyncSettings()
         G_reader_settings:saveSetting(self.plugin_id, self.settings)
         
-        local utils = require("utils")
+        local utils = dofile(_plugin_dir .. "utils.lua")
         utils.show_msg(_("Cloud Library: All auto sync disabled"))
     else
         self.settings.auto_upload_on_annotate = false
@@ -1741,7 +1741,7 @@ function CloudLibraryPlugin:toggleAutoSyncQuick()
         self:updateAutoSyncSettings()
         G_reader_settings:saveSetting(self.plugin_id, self.settings)
         
-        local utils = require("utils")
+        local utils = dofile(_plugin_dir .. "utils.lua")
         utils.show_msg(_("Cloud Library: Worry-Free Sync Mode enabled (auto upload on close/suspend + auto download merge on open)"))
     end
 end

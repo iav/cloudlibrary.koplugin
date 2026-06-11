@@ -1,3 +1,21 @@
+-- Get plugin directory
+local src = debug.getinfo(1, "S").source or ""
+local path = (src:sub(1, 1) == "@") and src:sub(2):match("^(.*)/[^/]+$") or nil
+local _plugin_dir
+
+if path then
+    if path:sub(1, 1) ~= "/" then
+        local ok, lfs = pcall(require, "libs/libkoreader-lfs")
+        local cwd = ok and lfs and lfs.currentdir()
+        if cwd then
+            path = cwd .. "/" .. path
+        end
+    end
+    _plugin_dir = path .. "/"
+else
+    _plugin_dir = "./"
+end
+
 local logger = require("logger")
 local UIManager = require("ui/uimanager")
 local Notification = require("ui/widget/notification")
@@ -6,7 +24,7 @@ local lfs = require("libs/libkoreader-lfs")
 local DataStorage = require("datastorage")
 local _ = require("gettext")
 local Event = require("ui/event")
-local utils = require("utils")  
+local utils = dofile(_plugin_dir .. "utils.lua")  
 local ProgressbarDialog = require("ui/widget/progressbardialog")
 local blitbuffer = require("ffi/blitbuffer") 
 
@@ -46,7 +64,7 @@ function ManualSync:syncCurrentBook(is_upload)
         return
     end
 
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local server = remote.get_server()
     if not server then
         self:showMsg(_("Cloud storage service not configured, please configure in settings first"))
@@ -109,7 +127,7 @@ function ManualSync:syncCurrentBookMerge()
         return
     end
 
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local server = remote.get_server()
     if not server then
         self:showMsg(_("Cloud storage service not configured, please configure in settings first"))
@@ -172,7 +190,7 @@ function ManualSync:doSyncCurrentBook(is_upload, file, metadata_file)
         author = author,
     }
 
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local naming_mode = self.settings.metadata_naming_mode or "metadata"
 
     if is_upload then
@@ -226,7 +244,7 @@ function ManualSync:doSyncCurrentBook(is_upload, file, metadata_file)
     end
 
     -- Merge or override metadata
-    local Merger = require("merge")
+    local Merger = dofile(_plugin_dir .. "merge.lua")
     local merged_data
     local settings = G_reader_settings:readSetting("cloud_library_plugin", {})
     local keep_local_settings = settings.override_keep_local_settings == true
@@ -290,7 +308,7 @@ function ManualSync:doSyncCurrentBookMerge(file, metadata_file)
         author = author,
     }
 
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local naming_mode = self.settings.metadata_naming_mode or "metadata"
 
     local ReaderUI = require("apps/reader/readerui")
@@ -321,7 +339,7 @@ function ManualSync:doSyncCurrentBookMerge(file, metadata_file)
     end
 
     -- Merge metadata
-    local Merger = require("merge")
+    local Merger = dofile(_plugin_dir .. "merge.lua")
     local merged_data = Merger.merge(book.metadata, downloaded_file)
     os.remove(downloaded_file)
 
@@ -369,7 +387,7 @@ function ManualSync:batchSyncWithFMSelection(is_upload, is_merge)
         return
     end
 
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local server = remote.get_server()
     if not server then
         self:showMsg(_("Cloud storage service not configured, please configure in settings first"))
@@ -510,7 +528,7 @@ function ManualSync:processSelectedFiles(is_upload, is_merge, selected_files)
 end
 
 function ManualSync:doBatchSync(is_upload, is_merge, selected_books)
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local naming_mode = self.settings.metadata_naming_mode or "metadata"
     local sync_results = {
         type = "batch",
@@ -667,7 +685,7 @@ function ManualSync:writeSingleLog(book, is_upload, is_merge, success, error_rea
     local settings = G_reader_settings:readSetting("cloud_library_plugin", {})
     if settings.sync_log_enabled then
         pcall(function()
-            local sync_log = require("sync_log")
+            local sync_log = dofile(_plugin_dir .. "sync_log.lua")
             sync_log.sync_log(true)
         end)
     end
@@ -749,7 +767,7 @@ function ManualSync:writeBatchLog(results, is_upload, is_merge)
     local settings = G_reader_settings:readSetting("cloud_library_plugin", {})
     if settings.sync_log_enabled then
         pcall(function()
-            local sync_log = require("sync_log")
+            local sync_log = dofile(_plugin_dir .. "sync_log.lua")
             sync_log.sync_log(true)
         end)
     end

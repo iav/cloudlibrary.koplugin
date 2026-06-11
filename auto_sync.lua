@@ -1,10 +1,28 @@
+-- Get plugin directory
+local src = debug.getinfo(1, "S").source or ""
+local path = (src:sub(1, 1) == "@") and src:sub(2):match("^(.*)/[^/]+$") or nil
+local _plugin_dir
+
+if path then
+    if path:sub(1, 1) ~= "/" then
+        local ok, lfs = pcall(require, "libs/libkoreader-lfs")
+        local cwd = ok and lfs and lfs.currentdir()
+        if cwd then
+            path = cwd .. "/" .. path
+        end
+    end
+    _plugin_dir = path .. "/"
+else
+    _plugin_dir = "./"
+end
+
 local logger = require("logger")
 local UIManager = require("ui/uimanager")
 local Notification = require("ui/widget/notification")
 local lfs = require("libs/libkoreader-lfs")
 local DataStorage = require("datastorage")
 local _ = require("gettext")
-local utils = require("utils")
+local utils = dofile(_plugin_dir .. "utils.lua")
 
 local AutoSync = {
     is_syncing = false,
@@ -60,7 +78,7 @@ function AutoSync:sync(document, is_upload, source)
         return
     end
     
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local server = remote.get_server()
     if not server then
         if self.settings.auto_sync_notify then
@@ -159,7 +177,7 @@ function AutoSync:sync(document, is_upload, source)
     self.is_syncing = true
     
     UIManager:scheduleIn(0, function()
-        local remote = require("remote")
+        local remote = dofile(_plugin_dir .. "remote.lua")
         local success, error_type
         local naming_mode = self.settings.metadata_naming_mode or "metadata"
         
@@ -277,7 +295,7 @@ function AutoSync:writeLog(book, source_desc, is_upload, success, error_reason, 
     local settings = G_reader_settings:readSetting("cloud_library_plugin", {})
     if settings.sync_log_enabled then
         pcall(function()
-            local sync_log = require("sync_log")
+            local sync_log = dofile(_plugin_dir .. "sync_log.lua")
             sync_log.sync_log(true)
         end)
     end

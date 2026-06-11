@@ -1,6 +1,24 @@
 -- book_sync.lua
 -- Book file cloud sync module
 
+-- Get plugin directory
+local src = debug.getinfo(1, "S").source or ""
+local path = (src:sub(1, 1) == "@") and src:sub(2):match("^(.*)/[^/]+$") or nil
+local _plugin_dir
+
+if path then
+    if path:sub(1, 1) ~= "/" then
+        local ok, lfs = pcall(require, "libs/libkoreader-lfs")
+        local cwd = ok and lfs and lfs.currentdir()
+        if cwd then
+            path = cwd .. "/" .. path
+        end
+    end
+    _plugin_dir = path .. "/"
+else
+    _plugin_dir = "./"
+end
+
 local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local DataStorage = require("datastorage")
@@ -12,7 +30,7 @@ local ButtonDialog = require("ui/widget/buttondialog")
 local Device = require("device")
 local Screen = Device.screen
 local _ = require("gettext")
-local utils = require("utils")
+local utils = dofile(_plugin_dir .. "utils.lua")
 
 local M = {}
 
@@ -196,7 +214,7 @@ function M.write_batch_book_log(results, action)
     local settings = G_reader_settings:readSetting("cloud_library_plugin", {})
     if settings.sync_log_enabled then
         pcall(function()
-            local sync_log = require("sync_log")
+            local sync_log = dofile(_plugin_dir .. "sync_log.lua")
             sync_log.sync_log(true)
         end)
     end
@@ -607,7 +625,7 @@ function M.show_cloud_book_dialog(callback, plugin)
         return
     end
     
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local server = remote.get_server()
     if not server then
         show_notification(_("Cloud storage service not configured, please configure in settings first"), 3)
@@ -1213,7 +1231,7 @@ function M.batchUploadWithFMSelection(plugin)
         return
     end
     
-    local remote = require("remote")
+    local remote = dofile(_plugin_dir .. "remote.lua")
     local server = remote.get_server()
     if not server then
         UIManager:show(Notification:new{

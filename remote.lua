@@ -1,3 +1,21 @@
+-- Get plugin directory
+local src = debug.getinfo(1, "S").source or ""
+local path = (src:sub(1, 1) == "@") and src:sub(2):match("^(.*)/[^/]+$") or nil
+local _plugin_dir
+
+if path then
+    if path:sub(1, 1) ~= "/" then
+        local ok, lfs = pcall(require, "libs/libkoreader-lfs")
+        local cwd = ok and lfs and lfs.currentdir()
+        if cwd then
+            path = cwd .. "/" .. path
+        end
+    end
+    _plugin_dir = path .. "/"
+else
+    _plugin_dir = "./"
+end
+
 local json = require("json")
 local InfoMessage = require("ui/widget/infomessage")
 local Notification = require("ui/widget/notification")
@@ -343,7 +361,7 @@ function M.convert_metadata_to_json(lua_path)
         return nil
     end
     
-    local merge = require("merge")
+    local merge = dofile(_plugin_dir .. "merge.lua")
     local metadata = merge.load_metadata(lua_path)
     if not metadata then
         return nil
@@ -372,7 +390,7 @@ function M.convert_metadata_to_json_with_notemark(lua_path)
         return nil
     end
     
-    local merge = require("merge")
+    local merge = dofile(_plugin_dir .. "merge.lua")
     local metadata = merge.load_metadata(lua_path)
     if not metadata then
         return nil
@@ -546,7 +564,7 @@ function M.upload_book(book, naming_mode)
 end
 
 function M.download_book(book, naming_mode, progress_callback)
-    local Merger = require("merge")
+    local Merger = dofile(_plugin_dir .. "merge.lua")
     local ReaderUI = require("apps/reader/readerui")
     local current_ui = ReaderUI.instance
     local is_currently_open = (current_ui and current_ui.document and current_ui.document.file == book.file)
@@ -658,7 +676,7 @@ function M.download_book(book, naming_mode, progress_callback)
 end
 
 function M.download_book_merge(book, naming_mode, progress_callback)
-    local Merger = require("merge")
+    local Merger = dofile(_plugin_dir .. "merge.lua")
     local ReaderUI = require("apps/reader/readerui")
     local current_ui = ReaderUI.instance
     local is_currently_open = (current_ui and current_ui.document and current_ui.document.file == book.file)
@@ -762,7 +780,7 @@ function M.download_book_merge(book, naming_mode, progress_callback)
 end
 
 function M.download_book_before_open(book, naming_mode)
-    local Merger = require("merge")
+    local Merger = dofile(_plugin_dir .. "merge.lua")
     
     if not M.ensure_local_metadata(book) then
         return false, ERROR_TYPES.LOCAL_METADATA_NOT_EXISTS
@@ -844,7 +862,7 @@ function M.download_book_before_open(book, naming_mode)
 end
 
 function M.download_book_merge_before_open(book, naming_mode)
-    local Merger = require("merge")
+    local Merger = dofile(_plugin_dir .. "merge.lua")
     
     if not M.ensure_local_metadata(book) then
         return false, ERROR_TYPES.LOCAL_METADATA_NOT_EXISTS
