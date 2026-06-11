@@ -1,3 +1,21 @@
+-- Get plugin directory
+local src = debug.getinfo(1, "S").source or ""
+local path = (src:sub(1, 1) == "@") and src:sub(2):match("^(.*)/[^/]+$") or nil
+local _plugin_dir
+
+if path then
+    if path:sub(1, 1) ~= "/" then
+        local ok, lfs = pcall(require, "libs/libkoreader-lfs")
+        local cwd = ok and lfs and lfs.currentdir()
+        if cwd then
+            path = cwd .. "/" .. path
+        end
+    end
+    _plugin_dir = path .. "/"
+else
+    _plugin_dir = "./"
+end
+
 local logger = require("logger")
 local UIManager = require("ui/uimanager")
 local Notification = require("ui/widget/notification")
@@ -130,7 +148,7 @@ function Hooks:hookOnReaderReady()
                     end
     
                     -- 👇 前置检查2：服务器配置
-                    local remote = require("remote")
+                    local remote = dofile(_plugin_dir .. "remote.lua")
                     local server = remote.get_server()
                     if not server then
                         self_auto_sync:showNotification(title, _("Auto update failed (Cloud storage not configured)"), nil, false)
