@@ -955,8 +955,19 @@ function M.show_cloud_book_dialog(callback, plugin)
             -- from a taller previous build would keep driving scroll/focus
             -- geometry (onFocusMove calls _scrollBy on it). Clear it too.
             dialog.cropping_widget = nil
+            -- The rebuilt dialog may be shorter (the last page holds fewer rows), and
+            -- refreshing only its new extent would leave a strip of the old, taller frame
+            -- on screen. Refresh the union of the frames, and repaint what is underneath.
+            local old_dimen = dialog.movable and dialog.movable.dimen
+                and dialog.movable.dimen:copy()
             dialog:reinit()
-            UIManager:setDirty(dialog, "ui")
+            UIManager:setDirty("all", function()
+                local new_dimen = dialog and dialog.movable and dialog.movable.dimen
+                if old_dimen and new_dimen then
+                    return "ui", old_dimen:combine(new_dimen)
+                end
+                return "ui", new_dimen or old_dimen
+            end)
         else
             dialog = ButtonDialog:new{
                 title = title_text,
